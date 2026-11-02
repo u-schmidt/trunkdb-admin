@@ -3,7 +3,7 @@
 What changed in each release of TrunkDB Admin, newest first. Each release is
 tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-11-02
 
 The first public release, with trunkdb 0.30.0 (tag `v0.30.0`).
 
