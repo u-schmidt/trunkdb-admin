@@ -1,0 +1,17 @@
+[package]
+name = "trunkdb-admin-core"
+description = "Application services of TrunkDB Admin: sessions, queries and maintenance, without any UI dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+trunkdb.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

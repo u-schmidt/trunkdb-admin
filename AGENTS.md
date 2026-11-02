@@ -1,0 +1,111 @@
+# Working in this repository
+
+TrunkDB Admin is a Tauri 2 desktop app (React + TypeScript frontend, Rust
+backend) for inspecting and managing local [trunkdb](https://github.com/u-schmidt/trunkdb)
+databases. What the app does is in `README.md`, how it is built and why in
+`ARCHITECTURE.md`. This file is about how to work here.
+
+## Layout
+
+- `crates/admin-core/` — all behavior: sessions, overview, queries, documents,
+  indexes, check/export, errors, recent files, preferences. No Tauri
+  dependency; tested with `cargo test` against temporary databases.
+- `src-tauri/` — the shell: thin command adapters (`commands.rs`), app state,
+  window and bundle configuration. Commands translate and move work off the UI
+  thread; they do not contain logic.
+- `src/` — frontend. `ipc/` is the only code that talks to Tauri (`Backend`
+  interface + DTO types mirroring admin-core); `features/` holds screens;
+  `app/` holds top-level state; `test/` holds the fake backend for tests and the
+  sample-data backend used when the UI runs in a plain browser.
+
+## Commands
+
+| Task | Command |
+|---|---|
+| Install | `npm install` |
+| Run in development | `npm run tauri dev` (dev server on port 1430) |
+| UI only, sample data | `npm run dev`, then open http://127.0.0.1:1430 |
+| Everything below, in order | `npm run check` |
+| Format (write) | `npm run format` and `cargo fmt --all` |
+| Lint | `npm run lint` and `cargo clippy --workspace --all-targets -- -D warnings` |
+| Type-check | `npm run typecheck` |
+| Frontend tests | `npm test` |
+| Backend tests | `cargo test --workspace` |
+| Cross-process tests with the pinned trunkdb CLI | `npm run test:cli` (builds the CLI into `target/pinned-cli`; needs network once) |
+| macOS app | `npm run tauri build` → `target/release/bundle/macos/TrunkDB Admin.app` |
+
+## Rules
+
+- trunkdb is pinned by release tag (`tag = "v…"`) in the root `Cargo.toml`.
+  Use its public API only. A missing capability is a separate decision, never a reason to edit
+  trunkdb or to read database files directly.
+- Never hand a `trunkdb::Database` (or a clone) out of `Session::read`/`write`:
+  closing relies on the session being the only owner to release the file lock.
+- Every database command carries a `session_id`; nothing uses a global
+  "current database".
+- Whether a session may write is `Session::can_mutate`, false for a read-only
+  open. Every write goes through `Session::write`, which refuses
+  then with the `read_only` category; a new write action is shown only when
+  `session.can_mutate` is true.
+- Errors crossing IPC are `AppError` with a stable `ErrorCategory`. The frontend
+  branches on the category, never on message text.
+- The npm `@tauri-apps/*` packages and the Rust `tauri*` crates must stay on the
+  same minor version, or `tauri build` refuses.
+- Filtering, sorting, counting and paging happen in trunkdb, in one snapshot per
+  request. The frontend never reorders or filters rows.
+- Values cross IPC as text where JavaScript would lose them: condition values
+  are typed text, documents are JSON text that is displayed but never parsed.
+- A filter is a `FilterInput`: typed rows or trunkdb filter text.
+  Every reader of a filter goes through `FilterInput::conditions`; the
+  frontend never parses filter text, trunkdb reads and prints it.
+- Every way out of a modified document draft goes through
+  `useDraftGuard().requestLeave(action)` (`src/app/DraftGuard.tsx`). A new
+  navigation, close or delete action must use it too.
+- Quit is a custom menu item (`src-tauri/src/menu.rs`) that asks the frontend,
+  which calls `app_quit`. Do not restore the predefined Quit item: it would
+  terminate without asking about a draft.
+- A quit from outside the app (Dock, AppleScript, logout) is answered in
+  `src-tauri/src/terminate.rs` from the unsaved-draft flag the frontend keeps
+  current with `setUnsavedDraft`. Code that holds a draft must report it there.
+- Appearance (View → Appearance) is set natively with `AppHandle::set_theme`;
+  the styles follow through `prefers-color-scheme`. Colors are tokens in
+  `styles.css` with a light and a dark set; add new colors to both.
+- An export writes to a temporary file beside its destination and publishes it
+  only when complete and synced (`maintenance.rs`). Keep the database and WAL
+  alias checks on both sides of the write.
+- An import runs only into a new database: a temporary one beside the
+  destination, hard-linked into place when complete and closed, never over a
+  file (`import.rs`). trunkdb's import isn't atomic; never run it
+  into an open session's database.
+- Component tests replace the CodeMirror editor with `test/PlainJsonEditor`;
+  CodeMirror itself is covered by `components/JsonEditor.test.tsx`.
+- Tests create their own temporary databases. Never point one at a personal file.
+- Dependencies are exact-pinned in `package.json`; both lockfiles are committed.
+
+## Dependency choices
+
+- **`tauri-plugin-dialog`** for native open and save dialogs; the frontend has
+  no other filesystem capability.
+- **CodeMirror 6 with `@codemirror/lang-json`** for the document editor. It is
+  given a string and reports a string; highlighting and diagnostics never
+  rewrite the text. `JsonEditor.test.tsx` checks that text JavaScript's JSON
+  would damage comes back unchanged.
+- **Native `<dialog>`** for modal dialogs: the WebView provides the focus trap,
+  inert background and focus return.
+- **No state-management, form, table or UI component library:** React state
+  and one context (the draft guard) are enough, and the result table is plain
+  markup because sorting and paging happen in trunkdb.
+
+## The app icon
+
+The icon is the small trunkdb mark (white elephant, petrol stack, on navy
+`#0F2747`) on a macOS rounded square: `src-tauri/icons/app-icon.svg`. The
+bundle's icon files are made from it. `tauri icon` also writes mobile and
+Windows Store sizes this app doesn't use, so write them elsewhere:
+
+```bash
+npx tauri icon src-tauri/icons/app-icon.svg --output /tmp/trunkdb-admin-icons
+```
+
+Then copy `32x32.png`, `64x64.png`, `128x128.png`, `128x128@2x.png`,
+`icon.png`, `icon.icns` and `icon.ico` into `src-tauri/icons/`.

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      # The Tauri shell embeds the built frontend, so `dist/` must exist
+      # before clippy and the Rust tests compile it.
+      - run: npm run build
+      - run: npm run check
+      # The trunkdb CLI at the pinned release, as a second process.
+      - run: npm run test:cli
+
+  msrv:
+    name: Minimum Rust version (rust-version in Cargo.toml)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: Swatinem/rust-cache@v2
+      # admin-core only, the workspace's default member: the Tauri shell
+      # needs the frontend and the system's WebView libraries.
+      - run: cargo test

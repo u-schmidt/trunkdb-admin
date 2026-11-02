@@ -1,0 +1,20 @@
+[workspace]
+members = ["crates/admin-core", "src-tauri"]
+default-members = ["crates/admin-core"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+publish = false
+license = "MIT"
+repository = "https://github.com/u-schmidt/trunkdb-admin"
+
+[workspace.dependencies]
+# Pinned for reproducible builds and file compatibility. The tool
+# reads and writes exactly what this trunkdb build does; bump deliberately.
+trunkdb = { git = "https://github.com/u-schmidt/trunkdb.git", tag = "v0.30.0", version = "=0.30.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
