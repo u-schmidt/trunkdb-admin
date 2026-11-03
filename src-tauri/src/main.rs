@@ -11,10 +11,17 @@ use state::AppState;
 use tauri::Manager;
 
 fn main() {
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
+    // The UI test build only (see the `wdio-test` feature): a WebDriver
+    // server inside the app, which macOS has no other way to offer.
+    #[cfg(feature = "wdio-test")]
+    {
+        builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    }
+    let app = builder
         .setup(|app| {
-            let state_dir = app.path().app_local_data_dir()?;
+            let state_dir = state_dir(app)?;
             let state = AppState::new(&state_dir);
             let appearance = state.preferences.appearance();
             app.manage(state);
@@ -70,4 +77,15 @@ fn main() {
             app.state::<AppState>().sessions.close_all();
         }
     });
+}
+
+/// Where recent files and preferences live: the app's local data folder.
+/// The UI test build takes `TRUNKDB_ADMIN_STATE_DIR` instead, so a test
+/// starts from recent files it wrote itself and never from a person's.
+fn state_dir(app: &tauri::App) -> tauri::Result<std::path::PathBuf> {
+    #[cfg(feature = "wdio-test")]
+    if let Some(dir) = std::env::var_os("TRUNKDB_ADMIN_STATE_DIR") {
+        return Ok(dir.into());
+    }
+    app.path().app_local_data_dir()
 }

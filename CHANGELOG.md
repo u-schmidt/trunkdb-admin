@@ -24,6 +24,9 @@ Catching up with what trunkdb 0.30.0 offers.
   start and end, the whole ID in the tooltip; the Groups view hides the list's
   sort, and says to run groups before Explain; the collection header no longer
   moves while field paths are read.
+- **For UI tests:** a separate test build with a WebDriver server inside
+  (`npm run build:wdio-test`, never shipped), and `scripts/wdio-fixture.sh` to
+  start it on a fresh sample database without the file dialog.
 
 ## 0.1.0 — 2026-11-02
 

@@ -33,6 +33,8 @@ databases. What the app does is in `README.md`, how it is built and why in
 | Backend tests | `cargo test --workspace` |
 | Cross-process tests with the pinned trunkdb CLI | `npm run test:cli` (builds the CLI into `target/pinned-cli`; needs network once) |
 | macOS app | `npm run tauri build` → `target/release/bundle/macos/TrunkDB Admin.app` |
+| UI test build through WebDriver, never shipped | `npm run build:wdio-test` → `target/wdio-test/release/trunkdb-admin` |
+| A UI test run's database and recent files | `scripts/wdio-fixture.sh <empty folder>` → prints `TRUNKDB_ADMIN_STATE_DIR=…` |
 
 ## Rules
 
@@ -77,6 +79,12 @@ databases. What the app does is in `README.md`, how it is built and why in
   destination, hard-linked into place when complete and closed, never over a
   file (`import.rs`). trunkdb's import isn't atomic; never run it
   into an open session's database.
+- The WebDriver plugin for UI tests (`tauri-plugin-wdio-webdriver`) is linked
+  only by the `wdio-test` Cargo feature, off by default, and built only by
+  `scripts/build-wdio-test.sh`: its server takes full control of the window
+  on every launch. Its permission is given there through `TAURI_CONFIG`, never
+  by a file in `src-tauri/capabilities/`. Code for UI tests, like reading
+  `TRUNKDB_ADMIN_STATE_DIR`, sits behind `#[cfg(feature = "wdio-test")]`.
 - Component tests replace the CodeMirror editor with `test/PlainJsonEditor`;
   CodeMirror itself is covered by `components/JsonEditor.test.tsx`.
 - Tests create their own temporary databases. Never point one at a personal file.
@@ -86,6 +94,9 @@ databases. What the app does is in `README.md`, how it is built and why in
 
 - **`tauri-plugin-dialog`** for native open and save dialogs; the frontend has
   no other filesystem capability.
+- **`tauri-plugin-wdio-webdriver`**, pinned exactly, in the UI test build
+  only: macOS offers no WebDriver for WKWebView from outside the app, so UI
+  tests drive it through a server inside it.
 - **CodeMirror 6 with `@codemirror/lang-json`** for the document editor. It is
   given a string and reports a string; highlighting and diagnostics never
   rewrite the text. `JsonEditor.test.tsx` checks that text JavaScript's JSON

@@ -18,7 +18,8 @@
     "format:check": "prettier --check .",
     "tauri": "tauri",
     "test:cli": "scripts/install-pinned-cli.sh && cargo test -p trunkdb-admin-core --test cli -- --ignored",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
+    "build:wdio-test": "scripts/build-wdio-test.sh",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy -p trunkdb-admin --features wdio-test -- -D warnings && cargo test --workspace"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",
