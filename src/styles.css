@@ -102,6 +102,26 @@ button {
   padding: 0.4rem 0.8rem;
 }
 
+/* An icon sits before the label, centred on the text. */
+button:has(> svg) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+button > svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+/* Icon only: as wide as it is high. */
+button.icon {
+  padding-inline: 0.45rem;
+}
+
 button:hover:not(:disabled) {
   border-color: var(--muted);
 }
@@ -368,6 +388,8 @@ button.quiet {
 
 /* Form controls */
 
+/* Text fields, selects and buttons share one height: the same line height
+   and vertical padding, and a 1px border. */
 input[type="text"],
 select {
   font: inherit;
@@ -375,8 +397,40 @@ select {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.35rem 0.5rem;
+  padding: 0.4rem 0.5rem;
   min-width: 0;
+}
+
+input[type="text"]:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+/* See components/Select.tsx: flat, with our own arrow. */
+.select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.select select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 1.75rem;
+  width: 100%;
+  cursor: default;
+}
+
+.select select:disabled {
+  opacity: 0.55;
+}
+
+.select-chevron {
+  position: absolute;
+  right: 0.5rem;
+  color: var(--muted);
+  pointer-events: none;
 }
 
 input[type="text"] {

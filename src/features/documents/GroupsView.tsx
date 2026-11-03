@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { ErrorNotice } from "../../components/ErrorNotice";
+import { Select } from "../../components/Select";
 import type {
   Cell,
   ColumnInput,
@@ -197,7 +198,7 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
             return (
               <li key={column.key} className="filter-row">
                 <span className="filter-joiner">and</span>
-                <select
+                <Select
                   aria-label={`Column ${n} kind`}
                   value={column.kind}
                   onChange={(event) => change({ kind: event.target.value as Column["kind"] })}
@@ -207,7 +208,7 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
                       {label}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {column.kind !== "count" && (
                   <>
                     <span>of</span>

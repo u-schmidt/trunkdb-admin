@@ -24,6 +24,9 @@ Catching up with what trunkdb 0.30.0 offers.
   start and end, the whole ID in the tooltip; the Groups view hides the list's
   sort, and says to run groups before Explain; the collection header no longer
   moves while field paths are read.
+- **Look:** buttons carry icons beside their text (Lucide); selects are flat
+  like the text fields, with the same height, border and arrow in both
+  appearances.
 - **For UI tests:** a separate test build with a WebDriver server inside
   (`npm run build:wdio-test`, never shipped), and `scripts/wdio-fixture.sh` to
   start it on a fresh sample database without the file dialog.

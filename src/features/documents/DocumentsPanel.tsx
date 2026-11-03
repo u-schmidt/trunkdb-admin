@@ -1,3 +1,4 @@
+import { Braces, CodeXml, Columns3, Group, Plus, RefreshCw, Route, Table2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDraftGuard } from "../../app/DraftGuard";
 import { ErrorNotice } from "../../components/ErrorNotice";
@@ -308,12 +309,15 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
         <div className="results-toolbar">
           <div role="group" aria-label="Result view" className="segmented">
             <button type="button" aria-pressed={view === "json"} onClick={() => setView("json")}>
+              <Braces aria-hidden="true" />
               JSON
             </button>
             <button type="button" aria-pressed={view === "table"} onClick={() => setView("table")}>
+              <Table2 aria-hidden="true" />
               Table
             </button>
             <button type="button" aria-pressed={grouped} onClick={() => setView("groups")}>
+              <Group aria-hidden="true" />
               Groups
             </button>
           </div>
@@ -323,6 +327,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
               aria-expanded={choosing}
               onClick={() => setChoosing((open) => !open)}
             >
+              <Columns3 aria-hidden="true" />
               {applied.select !== null
                 ? `Columns (${applied.select.length})…`
                 : applied.except.length > 0
@@ -332,6 +337,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
           )}
           {canMutate && (
             <button type="button" onClick={newDocument}>
+              <Plus aria-hidden="true" />
               New document
             </button>
           )}
@@ -343,6 +349,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             aria-pressed={explainOpen}
             title={subject === null && grouped ? "Run groups first" : undefined}
           >
+            <Route aria-hidden="true" />
             Explain
           </button>
           <button
@@ -356,6 +363,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
                 : "The query trunkdb is asked for, as its Rust API"
             }
           >
+            <CodeXml aria-hidden="true" />
             Statement
           </button>
           {!grouped && (
@@ -367,6 +375,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             />
           )}
           <button type="button" onClick={refresh} disabled={loading}>
+            <RefreshCw aria-hidden="true" />
             Refresh
           </button>
         </div>

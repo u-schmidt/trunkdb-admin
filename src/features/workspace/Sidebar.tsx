@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AppError, CollectionSummary } from "../../ipc/types";
 
@@ -113,6 +114,7 @@ export function Sidebar({
               autoCorrect="off"
             />
             <button type="submit" disabled={adding || collections === null}>
+              <Plus aria-hidden="true" />
               Add
             </button>
           </div>

@@ -1,3 +1,4 @@
+import { Lock, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDraftGuard } from "../../app/DraftGuard";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -153,9 +154,11 @@ export function Workspace({
           </span>
         )}
         <button type="button" onClick={onSwitchMode} disabled={closing || switching}>
+          {canMutate ? <Lock aria-hidden="true" /> : <Pencil aria-hidden="true" />}
           {switching ? "Reopening…" : canMutate ? "Reopen read-only" : "Open for editing"}
         </button>
         <button type="button" onClick={onClose} disabled={closing || switching}>
+          <X aria-hidden="true" />
           {closing ? "Closing…" : "Close database"}
         </button>
       </header>

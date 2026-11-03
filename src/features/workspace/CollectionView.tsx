@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { AppError, CollectionSummary, Overview } from "../../ipc/types";
 import { DocumentsPanel } from "../documents/DocumentsPanel";
@@ -67,6 +68,7 @@ export function CollectionView({
           </div>
           {canMutate && (
             <button type="button" className="danger-quiet" onClick={onDelete}>
+              <Trash2 aria-hidden="true" />
               {collection.persisted ? "Delete collection…" : "Remove"}
             </button>
           )}

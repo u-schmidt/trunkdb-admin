@@ -1,3 +1,4 @@
+import { SquareTerminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Modal } from "../../components/Modal";
 import { toAppError } from "../../ipc/backend";
@@ -48,6 +49,7 @@ export function CopyCommand({ makeCommand, onError }: Props) {
   return (
     <>
       <button type="button" title={HELP} onClick={() => void copy()}>
+        <SquareTerminal aria-hidden="true" />
         Copy as command
       </button>
       {copied && (

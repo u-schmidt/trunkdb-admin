@@ -1,3 +1,4 @@
+import { Play, Plus, X } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -8,6 +9,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
+import { Select } from "../../components/Select";
 import { toAppError } from "../../ipc/backend";
 import { useBackend } from "../../ipc/BackendContext";
 import { FilterSyntaxHelp } from "./FilterSyntaxHelp";
@@ -231,7 +233,7 @@ export function FilterBuilder({
   const [switchNote, setSwitchNote] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
   const [nextKey, setNextKey] = useState(1);
-  // The value "+ value" just added, to take the focus.
+  // The value the add-a-value button just added, to take the focus.
   const [addedValue, setAddedValue] = useState<{ key: number; at: number } | null>(null);
   const [shownLoad, setShownLoad] = useState(loaded?.id ?? 0);
   if (loaded !== null && loaded.id !== shownLoad) {
@@ -451,7 +453,7 @@ export function FilterBuilder({
             const valueType = typeOf(row);
             const shape = shapeOf(row.operator);
             const typeMenu = (
-              <select
+              <Select
                 aria-label={`Condition ${n} value type`}
                 value={valueType}
                 disabled={takesString(row.operator)}
@@ -468,7 +470,7 @@ export function FilterBuilder({
                     {TYPE_LABELS[type]}
                   </option>
                 ))}
-              </select>
+              </Select>
             );
             return (
               <li key={row.key} className="filter-row">
@@ -486,7 +488,7 @@ export function FilterBuilder({
                   autoCapitalize="off"
                   autoCorrect="off"
                 />
-                <select
+                <Select
                   aria-label={`Condition ${n} operator`}
                   value={row.operator}
                   onChange={(event) =>
@@ -498,7 +500,7 @@ export function FilterBuilder({
                       {OPERATOR_LABELS[operator]}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {shape === "value" && (
                   <>
                     {typeMenu}
@@ -534,7 +536,7 @@ export function FilterBuilder({
                           {row.values.length > 1 && (
                             <button
                               type="button"
-                              className="quiet filter-values-remove"
+                              className="quiet icon filter-values-remove"
                               aria-label={`Remove value ${at + 1} of condition ${n}`}
                               title="Remove this value"
                               onClick={() =>
@@ -543,7 +545,7 @@ export function FilterBuilder({
                                 })
                               }
                             >
-                              ×
+                              <X aria-hidden="true" />
                             </button>
                           )}
                         </span>
@@ -557,13 +559,14 @@ export function FilterBuilder({
                           change(row.key, { values: [...row.values, ""] });
                         }}
                       >
-                        + value
+                        <Plus aria-hidden="true" />
+                        value
                       </button>
                     </span>
                   </>
                 )}
                 {shape === "kind" && (
-                  <select
+                  <Select
                     aria-label={`Condition ${n} kind`}
                     value={row.kind}
                     onChange={(event) => change(row.key, { kind: event.target.value as Kind })}
@@ -573,7 +576,7 @@ export function FilterBuilder({
                         {KIND_LABELS[kind]}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 )}
                 <button
                   type="button"
@@ -592,6 +595,7 @@ export function FilterBuilder({
       <div className="filter-footer">
         {mode === "rows" ? (
           <button type="button" onClick={addRow}>
+            <Plus aria-hidden="true" />
             Add condition
           </button>
         ) : (
@@ -616,20 +620,21 @@ export function FilterBuilder({
           <label htmlFor={sortDirectionId} className="sr-only">
             Sort direction
           </label>
-          <select
+          <Select
             id={sortDirectionId}
             value={sort.descending ? "desc" : "asc"}
             onChange={(event) => applySort({ ...sort, descending: event.target.value === "desc" })}
           >
             <option value="asc">ascending</option>
             <option value="desc">descending</option>
-          </select>
+          </Select>
         </span>
         <span className="filter-run">
           {edited && <span className="muted">Not applied yet</span>}
           {/* Never disabled while a query runs: a slow one can be replaced, and
               only the newest request's answer is shown. */}
           <button type="submit" className="primary">
+            <Play aria-hidden="true" />
             Run
           </button>
         </span>
@@ -659,7 +664,7 @@ function ValueControl({
   }, [focus]);
   if (type === "bool") {
     return (
-      <select
+      <Select
         ref={control}
         aria-label={label}
         value={boolText(text)}
@@ -667,7 +672,7 @@ function ValueControl({
       >
         <option value="true">true</option>
         <option value="false">false</option>
-      </select>
+      </Select>
     );
   }
   if (type === "null") return <span className="filter-null muted">null</span>;

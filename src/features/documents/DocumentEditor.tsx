@@ -1,3 +1,4 @@
+import { Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ErrorNotice } from "../../components/ErrorNotice";
@@ -72,6 +73,7 @@ export function DocumentEditor({ collection, editor, readOnly, onRequestClose }:
       ) : (
         <div className="editor-actions">
           <button type="button" className="primary" onClick={() => void save()} disabled={saving}>
+            <Save aria-hidden="true" />
             Save
           </button>
           {dirty || isNew ? (
@@ -94,6 +96,7 @@ export function DocumentEditor({ collection, editor, readOnly, onRequestClose }:
               onClick={() => setConfirmingDelete(true)}
               disabled={saving}
             >
+              <Trash2 aria-hidden="true" />
               Delete…
             </button>
           )}

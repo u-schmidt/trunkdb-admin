@@ -103,9 +103,14 @@ databases. What the app does is in `README.md`, how it is built and why in
   would damage comes back unchanged.
 - **Native `<dialog>`** for modal dialogs: the WebView provides the focus trap,
   inert background and focus return.
+- **`lucide-react`** for icons (ISC licence), exact-pinned. An icon stands
+  beside a button's text, never instead of it, and is `aria-hidden`; only a
+  small inline control like a value's × is icon-only, with an `aria-label`.
 - **No state-management, form, table or UI component library:** React state
   and one context (the draft guard) are enough, and the result table is plain
   markup because sorting and paging happen in trunkdb.
+- **Native `<select>`** through `components/Select.tsx`, which draws it flat
+  with its own arrow. The list that opens stays the system's.
 
 ## The app icon
 

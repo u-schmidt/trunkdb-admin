@@ -1,3 +1,4 @@
+import { FilePlus, FolderOpen, Import, Lock } from "lucide-react";
 import { shortenHome } from "../../components/shortenHome";
 import type { AppInfo, RecentFile } from "../../ipc/types";
 
@@ -37,15 +38,19 @@ export function StartScreen({
 
       <div className="start-actions">
         <button type="button" className="primary" onClick={onOpen} disabled={busy}>
+          <FolderOpen aria-hidden="true" />
           Open database…
         </button>
         <button type="button" onClick={onOpenReadOnly} disabled={busy}>
+          <Lock aria-hidden="true" />
           Open read-only…
         </button>
         <button type="button" onClick={onCreate} disabled={busy}>
+          <FilePlus aria-hidden="true" />
           Create database…
         </button>
         <button type="button" onClick={onImport} disabled={busy}>
+          <Import aria-hidden="true" />
           Import…
         </button>
       </div>

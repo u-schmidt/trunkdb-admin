@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import type { CollectionStorage, StorageReport } from "../../ipc/types";
@@ -58,6 +59,7 @@ export function StoragePanel({ storage, onRefresh, tools }: Props) {
             </span>
           )}
           <button type="button" onClick={onRefresh} disabled={storage.status === "loading"}>
+            <RefreshCw aria-hidden="true" />
             {storage.status === "loading" ? "Reading…" : "Refresh"}
           </button>
         </span>

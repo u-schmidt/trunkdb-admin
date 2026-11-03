@@ -1,3 +1,4 @@
+import { FileDown, Import, ShieldCheck } from "lucide-react";
 import { shortenHome } from "../../components/shortenHome";
 import type { AppError } from "../../ipc/types";
 import type { DatabaseTools } from "./useDatabaseTools";
@@ -42,6 +43,7 @@ export function DatabaseToolsPanel({
             </p>
           </div>
           <button type="button" onClick={tools.runCheck} disabled={busy}>
+            <ShieldCheck aria-hidden="true" />
             {check.status === "running" ? "Checking…" : "Run check"}
           </button>
         </div>
@@ -98,6 +100,7 @@ export function DatabaseToolsPanel({
             </p>
           </div>
           <button type="button" onClick={tools.startExport} disabled={busy}>
+            <FileDown aria-hidden="true" />
             {exporting.status === "running" ? "Exporting…" : "Export database…"}
           </button>
         </div>
@@ -133,6 +136,7 @@ export function DatabaseToolsPanel({
             </p>
           </div>
           <button type="button" onClick={tools.startImport} disabled={busy}>
+            <Import aria-hidden="true" />
             {importing.status === "running" ? "Importing…" : "Import into a new database…"}
           </button>
         </div>

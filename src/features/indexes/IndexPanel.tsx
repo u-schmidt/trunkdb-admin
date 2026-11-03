@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp, Plus } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { useBackend } from "../../ipc/BackendContext";
@@ -160,19 +161,21 @@ export function IndexPanel({ sessionId, collection, canMutate, onOverview }: Pro
                 />
                 <button
                   type="button"
+                  className="icon"
                   aria-label={`Move field ${index + 1} up`}
                   onClick={() => move(index, -1)}
                   disabled={index === 0}
                 >
-                  ↑
+                  <ArrowUp aria-hidden="true" />
                 </button>
                 <button
                   type="button"
+                  className="icon"
                   aria-label={`Move field ${index + 1} down`}
                   onClick={() => move(index, 1)}
                   disabled={index === rows.length - 1}
                 >
-                  ↓
+                  <ArrowDown aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -193,6 +196,7 @@ export function IndexPanel({ sessionId, collection, canMutate, onOverview }: Pro
                 setRows((current) => [...current, { key: nextKey.current++, path: "" }])
               }
             >
+              <Plus aria-hidden="true" />
               Add field
             </button>
             <label>
@@ -229,6 +233,7 @@ export function IndexPanel({ sessionId, collection, canMutate, onOverview }: Pro
           )}
           <div>
             <button type="submit" className="primary" disabled={creating}>
+              <Plus aria-hidden="true" />
               {creating ? "Creating…" : "Create index"}
             </button>
           </div>

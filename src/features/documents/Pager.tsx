@@ -1,4 +1,6 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useId } from "react";
+import { Select } from "../../components/Select";
 import { PAGE_SIZES } from "./useCollectionQuery";
 
 /** A page of anything: documents or groups. */
@@ -31,7 +33,7 @@ export function Pager({ result, units = DOCUMENTS, busy, onPage, onPageSize }: P
       </span>
       <span className="pager-controls">
         <label htmlFor={sizeId}>Per page</label>
-        <select
+        <Select
           id={sizeId}
           value={pageSize}
           onChange={(event) => onPageSize(Number(event.target.value))}
@@ -41,8 +43,9 @@ export function Pager({ result, units = DOCUMENTS, busy, onPage, onPageSize }: P
               {size}
             </option>
           ))}
-        </select>
+        </Select>
         <button type="button" onClick={() => onPage(page - 1)} disabled={busy || page === 0}>
+          <ChevronLeft aria-hidden="true" />
           Previous
         </button>
         <button
@@ -51,6 +54,7 @@ export function Pager({ result, units = DOCUMENTS, busy, onPage, onPageSize }: P
           disabled={busy || page + 1 >= pageCount}
         >
           Next
+          <ChevronRight aria-hidden="true" />
         </button>
       </span>
     </nav>

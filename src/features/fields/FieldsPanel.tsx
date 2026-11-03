@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ErrorNotice } from "../../components/ErrorNotice";
 import type { FieldPath } from "../../ipc/types";
@@ -35,6 +36,7 @@ export function FieldsPanel() {
               : ""}
         </p>
         <button type="button" onClick={fields.refresh} disabled={state.status === "loading"}>
+          <RefreshCw aria-hidden="true" />
           {state.status === "loading" ? "Reading…" : "Refresh"}
         </button>
       </div>
