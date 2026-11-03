@@ -12,6 +12,8 @@ import type {
 
 /** How documents are grouped, apart from which documents and the page. */
 export interface GroupSettings {
+  /** Arrays made one document per element before grouping. */
+  unwind: string[];
   groupBy: string[];
   columns: ColumnInput[];
   sort: GroupSort | null;
@@ -62,6 +64,7 @@ export function useGroups(sessionId: string, collection: string): Groups {
       request_id: requestId,
       collection,
       filter: ask.filter,
+      unwind: ask.settings.unwind,
       group_by: ask.settings.groupBy,
       columns: ask.settings.columns,
       sort: ask.settings.sort,

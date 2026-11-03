@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toAppError } from "../../ipc/backend";
 import { useBackend } from "../../ipc/BackendContext";
-import type { AppError, FilterInput, QueryResult, SortInput } from "../../ipc/types";
+import type { AppError, FilterInput, HintInput, QueryResult, SortInput } from "../../ipc/types";
 import { NO_FILTER } from "./filter";
 
 /** What decides which documents are listed, apart from the page. */
@@ -12,6 +12,10 @@ export interface Criteria {
   pageSize: number;
   /** Chosen fields (trunkdb SPEC §106); null: whole documents. */
   select: string[] | null;
+  /** Fields left out of whole documents (trunkdb SPEC §143); empty: none. */
+  except: string[];
+  /** The index the page is read by; null: trunkdb's choice. */
+  hint: HintInput | null;
 }
 
 export const PAGE_SIZES = [25, 50, 100] as const;
@@ -21,6 +25,8 @@ export const DEFAULT_CRITERIA: Criteria = {
   sort: { field: "_id", descending: false },
   pageSize: 50,
   select: null,
+  except: [],
+  hint: null,
 };
 
 export interface CollectionQuery {
@@ -39,8 +45,10 @@ export interface CollectionQuery {
   /** New criteria always start at the first page. */
   apply: (criteria: Criteria) => void;
   goToPage: (page: number) => void;
-  /** Other fields, or whole documents, on the same page. */
-  choose: (select: string[] | null) => void;
+  /** Other fields, fields left out, or whole documents, on the same page. */
+  choose: (select: string[] | null, except?: string[]) => void;
+  /** Another index, or trunkdb's choice, for the same page. */
+  setHint: (hint: HintInput | null) => void;
   /** Same criteria and page, read again. */
   refresh: () => void;
 }
@@ -73,6 +81,8 @@ export function useCollectionQuery(sessionId: string, collection: string): Colle
           page,
           page_size: criteria.pageSize,
           select: criteria.select,
+          except: criteria.except,
+          hint: criteria.hint,
         })
         .then(
           (answer) => {
@@ -116,10 +126,15 @@ export function useCollectionQuery(sessionId: string, collection: string): Colle
   const goToPage = useCallback((page: number) => run(position.current.criteria, page), [run]);
   const refresh = useCallback(() => run(position.current.criteria, position.current.page), [run]);
   const choose = useCallback(
-    (select: string[] | null) =>
-      run({ ...position.current.criteria, select }, position.current.page),
+    (select: string[] | null, except: string[] = []) =>
+      run({ ...position.current.criteria, select, except }, position.current.page),
     [run],
   );
 
-  return { result, applied, requested, loading, error, apply, goToPage, choose, refresh };
+  const setHint = useCallback(
+    (hint: HintInput | null) => run({ ...position.current.criteria, hint }, position.current.page),
+    [run],
+  );
+
+  return { result, applied, requested, loading, error, apply, goToPage, choose, setHint, refresh };
 }

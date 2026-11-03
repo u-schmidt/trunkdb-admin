@@ -136,6 +136,39 @@ describe("chosen columns", () => {
     await waitFor(() => expect(screen.queryByRole("note")).not.toBeInTheDocument());
   });
 
+  it("hides fields from whole documents, says so, and switches back", async () => {
+    const backend = backendWith();
+    const user = await openPeople(backend);
+    await user.click(screen.getByRole("button", { name: "Table" }));
+    await user.click(screen.getByRole("button", { name: "Columns…" }));
+    const chooser = screen.getByRole("form", { name: "Columns" });
+    await user.click(within(chooser).getByRole("button", { name: "All but these" }));
+    while (within(chooser).queryByRole("button", { name: "Remove column 1" }) !== null) {
+      await user.click(within(chooser).getByRole("button", { name: "Remove column 1" }));
+    }
+    await user.click(within(chooser).getByRole("button", { name: "Add column" }));
+    await user.type(within(chooser).getByLabelText("Column 1 path"), "bio");
+    await user.click(within(chooser).getByRole("button", { name: "Hide these fields" }));
+
+    expect(lastQuery(backend)).toMatchObject({ select: null, except: ["bio"] });
+    expect(await screen.findByRole("button", { name: "Columns (1 hidden)…" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    const note = await screen.findByRole("note");
+    expect(note).toHaveTextContent("Each document without bio.");
+
+    // The chooser opens as it was left; Only these sends a selection alone.
+    await user.click(screen.getByRole("button", { name: "Table" }));
+    await user.click(screen.getByRole("button", { name: "Columns (1 hidden)…" }));
+    const again = screen.getByRole("form", { name: "Columns" });
+    expect(within(again).getByRole("button", { name: "All but these" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(within(again).getByRole("button", { name: "Only these" }));
+    await user.click(within(again).getByRole("button", { name: "Show these columns" }));
+    expect(lastQuery(backend)).toMatchObject({ select: ["bio"], except: [] });
+  });
+
   it("keeps the choice through a filter, and Explain reads what the list reads", async () => {
     const backend = backendWith({
       collectionExplain: vi.fn(async (_session: string, request: QueryRequest) =>

@@ -27,6 +27,7 @@ fn eq_string(field: &str, text: &str) -> ConditionInput {
             value_type: ValueType::String,
             text: text.to_string(),
         }),
+        ..Default::default()
     }
 }
 
@@ -402,6 +403,7 @@ fn invalid_filter_conditions_stop_a_save_before_it_writes() {
             value_type: ValueType::Int,
             text: "abc".to_string(),
         }),
+        ..Default::default()
     }]);
 
     let error = fx.session.save_document(&request).unwrap_err();

@@ -443,6 +443,52 @@ describe("filter, sort and paging", () => {
     });
   });
 
+  it("sends the values of is one of, keeping a value typed before, and a kind", async () => {
+    const backend = peopleBackend();
+    const user = await openPeople(backend);
+
+    await user.click(screen.getByRole("button", { name: "Add condition" }));
+    await user.type(screen.getByLabelText("Condition 1 field path"), "age");
+    await user.selectOptions(screen.getByLabelText("Condition 1 value type"), "int");
+    await user.type(screen.getByLabelText("Condition 1 value"), "20");
+    await user.selectOptions(screen.getByLabelText("Condition 1 operator"), "in");
+    expect(screen.getByLabelText("Condition 1 value 1")).toHaveValue("20");
+    await user.click(screen.getByRole("button", { name: "Add a value to condition 1" }));
+    // The value just added takes the focus.
+    expect(screen.getByLabelText("Condition 1 value 2")).toHaveFocus();
+    await user.keyboard("21");
+    await user.click(screen.getByRole("button", { name: "Add a value to condition 1" }));
+    await user.click(screen.getByRole("button", { name: "Remove value 3 of condition 1" }));
+    await user.click(screen.getByRole("button", { name: "Add condition" }));
+    await user.type(screen.getByLabelText("Condition 2 field path"), "score");
+    await user.selectOptions(screen.getByLabelText("Condition 2 operator"), "is_not_kind");
+    expect(screen.queryByLabelText("Condition 2 value type")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Condition 2 kind"), "number");
+    await user.click(screen.getByRole("button", { name: "Add condition" }));
+    await user.type(screen.getByLabelText("Condition 3 field path"), "name");
+    await user.selectOptions(screen.getByLabelText("Condition 3 operator"), "starts_with");
+    expect(screen.getByLabelText("Condition 3 value type")).toBeDisabled();
+    await user.type(screen.getByLabelText("Condition 3 value"), "An");
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    await waitFor(() => expect(requests(backend)).toHaveLength(2));
+    expect(lastRequest(backend).filter).toEqual({
+      rows: [
+        {
+          field: "age",
+          operator: "in",
+          value: null,
+          values: [
+            { type: "int", text: "20" },
+            { type: "int", text: "21" },
+          ],
+        },
+        { field: "score", operator: "is_not_kind", value: null, kind: "number" },
+        { field: "name", operator: "starts_with", value: { type: "string", text: "An" } },
+      ],
+    });
+  });
+
   it("pages in the backend and returns to the first page on filter, sort and size changes", async () => {
     const backend = peopleBackend();
     const user = await openPeople(backend);
@@ -721,6 +767,67 @@ describe("explain", () => {
     expect(panel()).toHaveTextContent("1.5 ms");
     const reads = within(panel()).getByRole("table", { name: "Index reads" });
     expect(within(reads).getAllByRole("row")[1]).toHaveTextContent("_idthe whole indexforward100");
+  });
+
+  it("reads the page by a passed-over plan as a hint, and lets trunkdb choose again", async () => {
+    const byAge = { kind: "index" as const, fields: ["age"] };
+    const backend = peopleBackend({
+      collectionExplain: vi.fn(async (_session: string, request: QueryRequest) =>
+        explainOf(request, {
+          hinted: request.hint !== null,
+          alternatives: [
+            {
+              plan: "index",
+              indexes: ["age"],
+              entries: 12,
+              more_than: false,
+              reads_documents: false,
+              fewer: true,
+              hint: byAge,
+            },
+            {
+              plan: "scan",
+              indexes: [],
+              entries: 0,
+              more_than: false,
+              reads_documents: true,
+              fewer: false,
+              hint: { kind: "no_index" },
+            },
+          ],
+        }),
+      ),
+    });
+    const user = await openPeople(backend);
+    await user.click(screen.getByRole("button", { name: "Explain" }));
+    const others = await within(panel()).findByRole("table", {
+      name: "Other ways to read this page",
+    });
+    expect(within(others).getAllByRole("row")[1]).toHaveTextContent(
+      "the index on agefewer entries12the entries decide",
+    );
+
+    await user.click(
+      within(others).getByRole("button", { name: "Read the page by the index on age" }),
+    );
+
+    await waitFor(() => expect(lastRequest(backend).hint).toEqual(byAge));
+    // The same page: a hint changes how, not which.
+    expect(lastRequest(backend).page).toBe(0);
+    expect(screen.getByRole("note")).toHaveTextContent("Pages are read by the index on age");
+    await within(panel()).findByText(/This is the index on age, as the hint asks/);
+    expect(explainRequests(backend).at(-1)?.hint).toEqual(byAge);
+    expect(
+      within(
+        within(panel()).getByRole("table", { name: "Other ways to read this page" }),
+      ).getAllByRole("row")[1],
+    ).toHaveTextContent("in use");
+
+    await user.click(
+      within(screen.getByRole("note")).getByRole("button", { name: "Let trunkdb choose" }),
+    );
+    await waitFor(() => expect(lastRequest(backend).hint).toBeNull());
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 
   it("shows bounds and an index walked in order, and names an index the sort lacks", async () => {

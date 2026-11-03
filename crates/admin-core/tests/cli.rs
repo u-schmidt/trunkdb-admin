@@ -283,6 +283,8 @@ fn the_copied_command_finds_what_the_list_shows() {
         page: 0,
         page_size: 1000,
         select: Some(vec!["name".into()]),
+        except: Vec::new(),
+        hint: None,
     };
     let listed: Vec<String> = fx
         .session

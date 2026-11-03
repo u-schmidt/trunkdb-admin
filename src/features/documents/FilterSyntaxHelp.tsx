@@ -15,6 +15,7 @@ const SECTIONS: Section[] = [
     examples: [
       { text: 'status = "open"', says: "equal; also !=, <, <=, >, >=" },
       { text: 'name contains "smith"', says: "part of a text, in any case" },
+      { text: 'title starts with "Fix"', says: "the start of a text, case counting" },
       { text: 'status in ("open", "blocked")', says: "one of several values; also not in" },
       { text: "price >= 10 and price < 20", says: "a range" },
     ],
@@ -27,10 +28,14 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    title: "Missing and null",
+    title: "Missing, null and kinds",
     examples: [
       { text: "note is null", says: "null or missing; also is not null" },
       { text: "exists(note)", says: "the field is there; also not exists(…)" },
+      {
+        text: "hours is string",
+        says: "a kind of value: bool, int, float, number, string, date, id, array, object, binary; also is not",
+      },
     ],
   },
   {

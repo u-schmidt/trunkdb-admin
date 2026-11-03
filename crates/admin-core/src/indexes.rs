@@ -60,10 +60,16 @@ impl IndexRequest {
     }
 
     fn name(fields: &[String]) -> String {
-        match fields {
-            [single] => single.clone(),
-            several => format!("({})", several.join(", ")),
-        }
+        index_name(fields)
+    }
+}
+
+/// An index as trunkdb names it: `status`, or `(status, created)` for a
+/// compound one.
+pub(crate) fn index_name(fields: &[String]) -> String {
+    match fields {
+        [single] => single.clone(),
+        several => format!("({})", several.join(", ")),
     }
 }
 

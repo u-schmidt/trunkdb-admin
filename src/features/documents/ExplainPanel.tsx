@@ -1,4 +1,4 @@
-import type { ExplainReport, IndexSummary } from "../../ipc/types";
+import type { AlternativeReport, ExplainReport, HintInput, IndexSummary } from "../../ipc/types";
 import type { ExplainState } from "./useExplain";
 
 interface Props {
@@ -10,13 +10,26 @@ interface Props {
   /** The group fields of the groups shown. */
   groupFields: string[];
   indexes: IndexSummary[];
+  /** The list's hint; null: trunkdb's choice. */
+  hint: HintInput | null;
+  /** Reads the list's page with another hint, or none. */
+  onHint: (hint: HintInput | null) => void;
   onClose: () => void;
 }
 
 const count = (n: number) => n.toLocaleString("en");
 
 /** How trunkdb read the page shown (trunkdb SPEC §94), or made the groups (§107.6). */
-export function ExplainPanel({ state, sortField, grouped, groupFields, indexes, onClose }: Props) {
+export function ExplainPanel({
+  state,
+  sortField,
+  grouped,
+  groupFields,
+  indexes,
+  hint,
+  onHint,
+  onClose,
+}: Props) {
   const answer =
     state.status === "loaded" ? state.report : state.status === "loading" ? state.previous : null;
   // While a switch between list and groups loads, the other's answer isn't shown.
@@ -51,7 +64,13 @@ export function ExplainPanel({ state, sortField, grouped, groupFields, indexes, 
           {report.groups !== null ? (
             <GroupsReportView report={report} groups={report.groups} groupFields={groupFields} />
           ) : (
-            <ExplainReportView report={report} sortField={sortField} indexes={indexes} />
+            <ExplainReportView
+              report={report}
+              sortField={sortField}
+              indexes={indexes}
+              hint={hint}
+              onHint={onHint}
+            />
           )}
         </div>
       )}
@@ -63,15 +82,27 @@ function ExplainReportView({
   report,
   sortField,
   indexes,
+  hint,
+  onHint,
 }: {
   report: ExplainReport;
   sortField: string;
   indexes: IndexSummary[];
+  hint: HintInput | null;
+  onHint: (hint: HintInput | null) => void;
 }) {
   const ms = (report.elapsed_micros / 1000).toLocaleString("en", { maximumFractionDigits: 1 });
   return (
     <>
       <p>{planText(report)}</p>
+      {report.hinted && hint !== null && (
+        <p>
+          This is {hintWords(hint)}, as the hint asks.{" "}
+          <button type="button" className="link" onClick={() => onHint(null)}>
+            Let trunkdb choose
+          </button>
+        </p>
+      )}
       {coveringText(report) !== null && <p>{coveringText(report)}</p>}
       {report.from_entries > 0 && <p>{fromEntriesText(report)}</p>}
       {missText(report) !== null && <p>{missText(report)}</p>}
@@ -94,8 +125,107 @@ function ExplainReportView({
         </dd>
       </dl>
       <ReadsTable report={report} />
+      <AlternativesTable report={report} hint={hint} onHint={onHint} />
     </>
   );
+}
+
+/** The plans trunkdb passed over (its SPEC §133), each one click away as a hint. */
+function AlternativesTable({
+  report,
+  hint,
+  onHint,
+}: {
+  report: ExplainReport;
+  hint: HintInput | null;
+  onHint: (hint: HintInput | null) => void;
+}) {
+  if (report.alternatives.length === 0) return null;
+  const current = JSON.stringify(hint);
+  return (
+    <>
+      <h3 className="explain-subheading">Other ways to read this page</h3>
+      <p className="muted">
+        What trunkdb would have read instead. A hint makes it read the page one of these ways; the
+        documents are the same.
+      </p>
+      <table className="plain-table" aria-label="Other ways to read this page">
+        <thead>
+          <tr>
+            <th scope="col">Plan</th>
+            <th scope="col" className="numeric">
+              Index entries
+            </th>
+            <th scope="col">Documents</th>
+            <th scope="col">
+              <span className="sr-only">Hint</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {report.alternatives.map((alternative, n) => {
+            const inUse = alternative.hint !== null && JSON.stringify(alternative.hint) === current;
+            return (
+              <tr key={n}>
+                <td>
+                  {alternativeWords(alternative)}
+                  {alternative.fewer && <span className="badge">fewer entries</span>}
+                </td>
+                <td className="numeric">
+                  {alternative.more_than ? "more than " : ""}
+                  {count(alternative.entries)}
+                </td>
+                <td>{alternative.reads_documents ? "one read per entry" : "the entries decide"}</td>
+                <td>
+                  {alternative.hint === null ? null : inUse ? (
+                    <span className="muted">in use</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="quiet"
+                      aria-label={`Read the page by ${alternativeWords(alternative)}`}
+                      onClick={() => alternative.hint !== null && onHint(alternative.hint)}
+                    >
+                      Use
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+/** A passed-over plan in words. */
+function alternativeWords(alternative: AlternativeReport): string {
+  const names = [...new Set(alternative.indexes)].join(", ");
+  switch (alternative.plan) {
+    case "scan":
+      return "every document, no index";
+    case "by_id":
+      return "lookups by ID";
+    case "index_order":
+      return names === "_id"
+        ? "the primary index, in sort order"
+        : `the index on ${names}, in sort order`;
+    case "index_union":
+      return `the indexes on ${names}, together`;
+    case "index":
+      return names === "_id" ? "the primary index" : `the index on ${names}`;
+    case "other":
+      return "a plan this version of the app does not describe";
+  }
+}
+
+/** A hint in words: "the index on age", "no index". */
+export function hintWords(hint: HintInput): string {
+  if (hint.kind === "no_index") return "reading every document, no index";
+  const [first, ...rest] = hint.fields;
+  if (first === "_id" && rest.length === 0) return "the primary index";
+  return `the index on ${rest.length === 0 ? first : `(${hint.fields.join(", ")})`}`;
 }
 
 function ReadsTable({ report }: { report: ExplainReport }) {

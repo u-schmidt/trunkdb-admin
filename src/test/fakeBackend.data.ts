@@ -76,17 +76,28 @@ export function resultFor(
     rows,
     columns: request.select === null ? columns : ["_id", ...request.select],
     select: request.select,
+    except: request.except,
   };
 }
 
 /** The columns `request` asks for: its group fields, the count, then its columns. */
 export function groupColumnsOf(request: GroupRequest): GroupColumn[] {
-  const labels = { count: "count", sum: "sum", avg: "average", min: "min", max: "max" } as const;
+  const labels = {
+    count: "count",
+    sum: "sum",
+    avg: "average",
+    min: "min",
+    max: "max",
+    count_distinct: "distinct",
+    first: "first",
+    last: "last",
+  } as const;
   return [
     ...request.group_by.map((label) => ({ label, group: true, kind: null })),
     { label: "count", group: false, kind: "count" as const },
     ...request.columns.map((c) => {
-      const what = c.kind === "count" ? "count" : `${labels[c.kind]} ${c.field}`;
+      const named = c.kind === "count" ? "count" : `${labels[c.kind]} ${c.field}`;
+      const what = c.by.trim() === "" ? named : `${named} by ${c.by.trim()}`;
       const condition = c.condition.trim();
       return {
         label: condition === "" ? what : `${what} where ${condition}`,
@@ -157,6 +168,8 @@ export function groupsExplainOf(
     from_entries: 300,
     groups: 3,
     elapsed_micros: 800,
+    hinted: false,
+    alternatives: [],
     ...overrides,
   };
 }
@@ -193,6 +206,8 @@ export function explainOf(
     from_entries: 0,
     groups: null,
     elapsed_micros: 1500,
+    hinted: false,
+    alternatives: [],
     ...overrides,
   };
 }

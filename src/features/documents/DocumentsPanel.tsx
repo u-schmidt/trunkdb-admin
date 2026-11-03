@@ -14,7 +14,7 @@ import type {
 import { ColumnChooser } from "./ColumnChooser";
 import { CopyCommand } from "./CopyCommand";
 import { DocumentEditor } from "./DocumentEditor";
-import { ExplainPanel } from "./ExplainPanel";
+import { ExplainPanel, hintWords } from "./ExplainPanel";
 import { StatementPanel } from "./StatementPanel";
 import { useFieldPaths } from "../fields/FieldPathsContext";
 import { isEmptyFilter, sameFilter } from "./filter";
@@ -80,7 +80,13 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
       draft.sort.field === requested.sort.field &&
       draft.sort.descending === requested.sort.descending;
     if (!same) {
-      query.apply({ ...draft, pageSize: requested.pageSize, select: requested.select });
+      query.apply({
+        ...draft,
+        pageSize: requested.pageSize,
+        select: requested.select,
+        except: requested.except,
+        hint: requested.hint,
+      });
     }
     if (settings !== null) runGroups({ settings, filter: draft.filter });
   };
@@ -103,6 +109,8 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
       page,
       page_size: applied.pageSize,
       select: applied.select,
+      except: applied.except,
+      hint: applied.hint,
     }),
     [collection.name, applied],
   );
@@ -219,8 +227,17 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
     );
   } else if (view === "json") {
     const chosen = applied.select;
+    const hidden = applied.except;
     body = (
       <>
+        {hidden.length > 0 && (
+          <p className="chosen-note muted" role="note">
+            Each document without {hidden.join(", ")}.{" "}
+            <button type="button" className="link" onClick={() => query.choose(null)}>
+              All fields
+            </button>
+          </p>
+        )}
         {chosen !== null && (
           <p className="chosen-note muted" role="note">
             Showing {chosen.length === 1 ? "1 chosen field" : `${chosen.length} chosen fields`} of
@@ -264,6 +281,15 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
           loaded={loaded}
           mistake={mistake}
         />
+        {!grouped && requested.hint !== null && (
+          <p className="hint-note muted" role="note">
+            Pages are read by {hintWords(requested.hint)}, a hint; the documents are the same with
+            any.{" "}
+            <button type="button" className="link" onClick={() => query.setHint(null)}>
+              Let trunkdb choose
+            </button>
+          </p>
+        )}
         {error !== null && mistake === null && dismissed !== error && (
           <ErrorNotice error={error} onDismiss={() => setDismissed(error)} />
         )}
@@ -292,7 +318,11 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
               aria-expanded={choosing}
               onClick={() => setChoosing((open) => !open)}
             >
-              {applied.select === null ? "Columns…" : `Columns (${applied.select.length})…`}
+              {applied.select !== null
+                ? `Columns (${applied.select.length})…`
+                : applied.except.length > 0
+                  ? `Columns (${applied.except.length} hidden)…`
+                  : "Columns…"}
             </button>
           )}
           {canMutate && (
@@ -332,11 +362,16 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
         </div>
         {choosing && view === "table" && (
           <ColumnChooser
-            initial={applied.select ?? (result?.columns ?? []).filter((name) => name !== "_id")}
-            choosing={applied.select !== null}
-            onChoose={(chosen) => {
+            initial={
+              applied.except.length > 0
+                ? applied.except
+                : (applied.select ?? (result?.columns ?? []).filter((name) => name !== "_id"))
+            }
+            initialMode={applied.except.length > 0 ? "except" : "only"}
+            choosing={applied.select !== null || applied.except.length > 0}
+            onChoose={(chosen, except) => {
               setChoosing(false);
-              query.choose(chosen);
+              query.choose(chosen, except);
             }}
             onClose={() => setChoosing(false)}
           />
@@ -348,6 +383,8 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             grouped={grouped}
             groupFields={groupsAsked?.settings.groupBy ?? []}
             indexes={collection.indexes}
+            hint={applied.hint}
+            onHint={query.setHint}
             onClose={closeExplain}
           />
         )}

@@ -6,8 +6,8 @@ mod common;
 use common::Fixture;
 use trunkdb::Document;
 use trunkdb_admin_core::{
-    ConditionInput, ErrorCategory, FilterInput, IndexReadReport, Operator, PlanKind, QueryRequest,
-    SortInput, SortReport, ValueInput, ValueType,
+    ConditionInput, ErrorCategory, FilterInput, HintInput, IndexReadReport, Operator, PlanKind,
+    QueryRequest, SortInput, SortReport, ValueInput, ValueType,
 };
 
 fn request(collection: &str, sort: &str, page: usize, page_size: usize) -> QueryRequest {
@@ -22,6 +22,8 @@ fn request(collection: &str, sort: &str, page: usize, page_size: usize) -> Query
         page,
         page_size,
         select: None,
+        except: Vec::new(),
+        hint: None,
     }
 }
 
@@ -33,6 +35,7 @@ fn condition(field: &str, operator: Operator, value_type: ValueType, text: &str)
             value_type,
             text: text.to_string(),
         }),
+        ..Default::default()
     }
 }
 
@@ -241,4 +244,72 @@ fn a_hint_that_cant_be_followed_is_invalid_input() {
         .unwrap_err();
     assert_eq!(error.category, ErrorCategory::InvalidInput);
     assert!(error.detail.as_deref().unwrap_or("").contains("name"));
+}
+
+/// The plans passed over (trunkdb SPEC §133), each with the hint that
+/// picks it; following one reads the page that way, with the same rows.
+#[test]
+fn passed_over_plans_name_their_hint_and_a_hint_reads_the_same_page() {
+    let fixture = people();
+    index(&fixture, "age");
+    index(&fixture, "name");
+    let mut asked = request("people", "_id", 0, 10);
+    asked.filter = FilterInput::Rows(vec![condition("age", Operator::Gte, ValueType::Int, "50")]);
+
+    let report = fixture.session.explain(&asked).unwrap();
+    assert!(!report.hinted);
+    let by_age = (report.alternatives.iter())
+        .find(|alternative| alternative.indexes == ["age"])
+        .expect("the index on age is passed over");
+    assert_eq!(
+        by_age.hint,
+        Some(HintInput::Index {
+            fields: vec!["age".into()]
+        })
+    );
+    let age_hint = by_age.hint.clone();
+    let scan = (report.alternatives.iter())
+        .find(|alternative| alternative.plan == PlanKind::Scan)
+        .expect("a scan is passed over");
+    assert_eq!(scan.hint, Some(HintInput::NoIndex));
+    assert!(scan.indexes.is_empty());
+    for alternative in &report.alternatives {
+        assert!(alternative.hint.is_some(), "{alternative:?}");
+    }
+
+    let plain = fixture.session.query(&asked).unwrap();
+    asked.hint = Some(HintInput::NoIndex);
+    let scanned = fixture.session.query(&asked).unwrap();
+    assert_eq!(scanned.rows, plain.rows);
+    assert_eq!(scanned.total, plain.total);
+    let report = fixture.session.explain(&asked).unwrap();
+    assert!(report.hinted);
+    assert_eq!(report.plan, PlanKind::Scan);
+    // The planner's own plan is among those passed over now.
+    assert!(
+        (report.alternatives.iter()).any(|alternative| alternative.indexes == ["_id"]),
+        "{:?}",
+        report.alternatives
+    );
+
+    asked.hint = age_hint;
+    let by_index = fixture.session.query(&asked).unwrap();
+    assert_eq!(by_index.rows, plain.rows);
+    let report = fixture.session.explain(&asked).unwrap();
+    assert!(report.hinted);
+    assert_eq!(report.reads[0].index, "age");
+}
+
+/// A hint the query can't follow fails it, saying so; the count alone
+/// never takes it.
+#[test]
+fn a_hint_that_cant_be_followed_is_an_input_error() {
+    let fixture = people();
+    let mut asked = request("people", "_id", 0, 10);
+    asked.hint = Some(HintInput::Index {
+        fields: vec!["age".into()],
+    });
+    let error = fixture.session.query(&asked).expect_err("no index on age");
+    assert_eq!(error.category, ErrorCategory::InvalidInput);
+    assert!(error.detail.is_some());
 }

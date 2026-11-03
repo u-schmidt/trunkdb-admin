@@ -12,11 +12,13 @@ import { toAppError } from "../../ipc/backend";
 import { useBackend } from "../../ipc/BackendContext";
 import { FilterSyntaxHelp } from "./FilterSyntaxHelp";
 import {
+  KINDS,
   OPERATORS,
   VALUE_TYPES,
   type AppError,
   type ConditionInput,
   type FilterInput,
+  type Kind,
   type Operator,
   type SortInput,
   type ValueType,
@@ -32,8 +34,26 @@ const OPERATOR_LABELS: Record<Operator, string> = {
   gt: "greater than",
   gte: "greater than or equal",
   contains: "contains (ignores case)",
+  starts_with: "starts with (case counts)",
+  in: "is one of",
+  not_in: "is none of",
   exists: "exists",
   missing: "is missing",
+  is_kind: "is of kind",
+  is_not_kind: "is not of kind",
+};
+
+const KIND_LABELS: Record<Kind, string> = {
+  string: "String",
+  int: "Int",
+  float: "Float",
+  number: "Number (Int or Float)",
+  bool: "Bool",
+  date: "DateTime",
+  id: "Id",
+  array: "Array",
+  object: "Object",
+  binary: "Binary",
 };
 
 const TYPE_LABELS: Record<ValueType, string> = {
@@ -58,7 +78,11 @@ interface Row {
   field: string;
   operator: Operator;
   type: ValueType;
+  /** The value of a single-value operator. */
   text: string;
+  /** The values of `in` and `not_in`, all of `type`. */
+  values: string[];
+  kind: Kind;
 }
 
 export interface FilterDraft {
@@ -94,7 +118,35 @@ interface Props {
   mistake?: FilterMistake | null;
 }
 
-const takesValue = (operator: Operator) => operator !== "exists" && operator !== "missing";
+type Shape = "value" | "values" | "kind" | "none";
+
+/** What an operator takes besides the field. */
+function shapeOf(operator: Operator): Shape {
+  switch (operator) {
+    case "exists":
+    case "missing":
+      return "none";
+    case "in":
+    case "not_in":
+      return "values";
+    case "is_kind":
+    case "is_not_kind":
+      return "kind";
+    default:
+      return "value";
+  }
+}
+
+/** Operators that search strings, whatever type was selected before. */
+const takesString = (operator: Operator) => operator === "contains" || operator === "starts_with";
+
+/** The type a row's value is sent as. */
+function typeOf(row: Pick<Row, "operator" | "type">): ValueType {
+  if (takesString(row.operator)) return "string";
+  // An `in` of null is `equals null`; the menu doesn't offer it.
+  if (shapeOf(row.operator) === "values" && row.type === "null") return "string";
+  return row.type;
+}
 
 /** A Bool row's value as its menu shows it: anything but "false" is true. */
 const boolText = (text: string) => (text === "false" ? "false" : "true");
@@ -107,16 +159,18 @@ function valueText(type: ValueType, text: string): string {
 }
 
 function toCondition(row: Row): ConditionInput {
-  if (!takesValue(row.operator)) {
-    return { field: row.field, operator: row.operator, value: null };
+  const base = { field: row.field, operator: row.operator, value: null };
+  const type = typeOf(row);
+  switch (shapeOf(row.operator)) {
+    case "none":
+      return base;
+    case "kind":
+      return { ...base, kind: row.kind };
+    case "values":
+      return { ...base, values: row.values.map((text) => ({ type, text: valueText(type, text) })) };
+    case "value":
+      return { ...base, value: { type, text: valueText(type, row.text) } };
   }
-  // "contains" is a string search whatever type was selected before.
-  const type = row.operator === "contains" ? "string" : row.type;
-  return {
-    field: row.field,
-    operator: row.operator,
-    value: { type, text: valueText(type, row.text) },
-  };
 }
 
 function rowsOf(conditions: ConditionInput[], firstKey: number): Row[] {
@@ -124,9 +178,27 @@ function rowsOf(conditions: ConditionInput[], firstKey: number): Row[] {
     key: firstKey + n,
     field: condition.field,
     operator: condition.operator,
-    type: condition.value?.type ?? "string",
+    type: condition.value?.type ?? condition.values?.[0]?.type ?? "string",
     text: condition.value?.text ?? "",
+    values: condition.values?.map((value) => value.text) ?? [""],
+    kind: condition.kind ?? "string",
   }));
+}
+
+/**
+ * A new operator keeps what was typed: one value becomes the first of a
+ * list, the first of a list the one value.
+ */
+function withOperator(row: Row, operator: Operator): Partial<Row> {
+  const from = shapeOf(row.operator);
+  const to = shapeOf(operator);
+  if (from === "value" && to === "values" && row.values.every((v) => v === "")) {
+    return { operator, values: [row.text] };
+  }
+  if (from === "values" && to === "value" && row.text === "") {
+    return { operator, text: row.values[0] ?? "" };
+  }
+  return { operator };
 }
 
 /** What an empty sort field means, as in the backend. */
@@ -156,6 +228,8 @@ export function FilterBuilder({
   const [switchNote, setSwitchNote] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
   const [nextKey, setNextKey] = useState(1);
+  // The value "+ value" just added, to take the focus.
+  const [addedValue, setAddedValue] = useState<{ key: number; at: number } | null>(null);
   const [shownLoad, setShownLoad] = useState(loaded?.id ?? 0);
   if (loaded !== null && loaded.id !== shownLoad) {
     setShownLoad(loaded.id);
@@ -276,15 +350,26 @@ export function FilterBuilder({
   const changeField = (row: Row, field: string) => {
     const known = knownPaths(fields.state)?.paths.find((p) => p.nameable && p.path === field);
     const type = known === undefined ? null : rowTypeOf(known);
-    const retype =
-      type !== null && row.text === "" && takesValue(row.operator) && row.operator !== "contains";
+    const shape = shapeOf(row.operator);
+    const untyped =
+      (shape === "value" && row.text === "") ||
+      (shape === "values" && row.values.every((v) => v === ""));
+    const retype = type !== null && untyped && !takesString(row.operator);
     change(row.key, retype ? { field, type } : { field });
   };
 
   const addRow = () => {
     setRows((current) => [
       ...current,
-      { key: nextKey, field: "", operator: "eq", type: "string", text: "" },
+      {
+        key: nextKey,
+        field: "",
+        operator: "eq",
+        type: "string",
+        text: "",
+        values: [""],
+        kind: "string",
+      },
     ]);
     setNextKey((key) => key + 1);
   };
@@ -360,7 +445,28 @@ export function FilterBuilder({
         <ol className="filter-rows">
           {rows.map((row, index) => {
             const n = index + 1;
-            const valueType = row.operator === "contains" ? "string" : row.type;
+            const valueType = typeOf(row);
+            const shape = shapeOf(row.operator);
+            const typeMenu = (
+              <select
+                aria-label={`Condition ${n} value type`}
+                value={valueType}
+                disabled={takesString(row.operator)}
+                onChange={(event) =>
+                  change(row.key, {
+                    type: event.target.value as ValueType,
+                    text: "",
+                    values: row.values.map(() => ""),
+                  })
+                }
+              >
+                {VALUE_TYPES.filter((type) => shape !== "values" || type !== "null").map((type) => (
+                  <option key={type} value={type}>
+                    {TYPE_LABELS[type]}
+                  </option>
+                ))}
+              </select>
+            );
             return (
               <li key={row.key} className="filter-row">
                 <span className="filter-joiner">{index === 0 ? "Where" : "and"}</span>
@@ -381,7 +487,7 @@ export function FilterBuilder({
                   aria-label={`Condition ${n} operator`}
                   value={row.operator}
                   onChange={(event) =>
-                    change(row.key, { operator: event.target.value as Operator })
+                    change(row.key, withOperator(row, event.target.value as Operator))
                   }
                 >
                   {OPERATORS.map((operator) => (
@@ -390,47 +496,81 @@ export function FilterBuilder({
                     </option>
                   ))}
                 </select>
-                {takesValue(row.operator) && (
+                {shape === "value" && (
                   <>
-                    <select
-                      aria-label={`Condition ${n} value type`}
-                      value={valueType}
-                      disabled={row.operator === "contains"}
-                      onChange={(event) =>
-                        change(row.key, { type: event.target.value as ValueType, text: "" })
-                      }
-                    >
-                      {VALUE_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {TYPE_LABELS[type]}
-                        </option>
-                      ))}
-                    </select>
-                    {valueType === "bool" ? (
-                      <select
-                        aria-label={`Condition ${n} value`}
-                        value={boolText(row.text)}
-                        onChange={(event) => change(row.key, { text: event.target.value })}
-                      >
-                        <option value="true">true</option>
-                        <option value="false">false</option>
-                      </select>
-                    ) : valueType === "null" ? (
-                      <span className="filter-null muted">null</span>
-                    ) : (
-                      <input
-                        type="text"
-                        className="filter-value"
-                        aria-label={`Condition ${n} value`}
-                        placeholder={PLACEHOLDERS[valueType] ?? ""}
-                        value={row.text}
-                        onChange={(event) => change(row.key, { text: event.target.value })}
-                        spellCheck={false}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                      />
-                    )}
+                    {typeMenu}
+                    <ValueControl
+                      label={`Condition ${n} value`}
+                      type={valueType}
+                      text={row.text}
+                      onChange={(text) => change(row.key, { text })}
+                    />
                   </>
+                )}
+                {shape === "values" && (
+                  <>
+                    {typeMenu}
+                    <span
+                      className="filter-values"
+                      role="group"
+                      aria-label={`Condition ${n} values`}
+                    >
+                      {row.values.map((text, at) => (
+                        <span key={at} className="filter-values-item">
+                          <ValueControl
+                            label={`Condition ${n} value ${at + 1}`}
+                            type={valueType}
+                            text={text}
+                            focus={addedValue?.key === row.key && addedValue.at === at}
+                            onChange={(next) =>
+                              change(row.key, {
+                                values: row.values.map((v, i) => (i === at ? next : v)),
+                              })
+                            }
+                          />
+                          {row.values.length > 1 && (
+                            <button
+                              type="button"
+                              className="quiet filter-values-remove"
+                              aria-label={`Remove value ${at + 1} of condition ${n}`}
+                              title="Remove this value"
+                              onClick={() =>
+                                change(row.key, {
+                                  values: row.values.filter((_, i) => i !== at),
+                                })
+                              }
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                      <button
+                        type="button"
+                        className="quiet"
+                        aria-label={`Add a value to condition ${n}`}
+                        onClick={() => {
+                          setAddedValue({ key: row.key, at: row.values.length });
+                          change(row.key, { values: [...row.values, ""] });
+                        }}
+                      >
+                        + value
+                      </button>
+                    </span>
+                  </>
+                )}
+                {shape === "kind" && (
+                  <select
+                    aria-label={`Condition ${n} kind`}
+                    value={row.kind}
+                    onChange={(event) => change(row.key, { kind: event.target.value as Kind })}
+                  >
+                    {KINDS.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {KIND_LABELS[kind]}
+                      </option>
+                    ))}
+                  </select>
                 )}
                 <button
                   type="button"
@@ -492,6 +632,55 @@ export function FilterBuilder({
         </span>
       </div>
     </form>
+  );
+}
+
+/** One typed value: a menu for a Bool, nothing to enter for a null, text otherwise. */
+function ValueControl({
+  label,
+  type,
+  text,
+  focus = false,
+  onChange,
+}: {
+  label: string;
+  type: ValueType;
+  text: string;
+  /** Takes the focus when this turns true: a value just added. */
+  focus?: boolean;
+  onChange: (text: string) => void;
+}) {
+  const control = useRef<HTMLInputElement & HTMLSelectElement>(null);
+  useEffect(() => {
+    if (focus) control.current?.focus();
+  }, [focus]);
+  if (type === "bool") {
+    return (
+      <select
+        ref={control}
+        aria-label={label}
+        value={boolText(text)}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    );
+  }
+  if (type === "null") return <span className="filter-null muted">null</span>;
+  return (
+    <input
+      ref={control}
+      type="text"
+      className="filter-value"
+      aria-label={label}
+      placeholder={PLACEHOLDERS[type] ?? ""}
+      value={text}
+      onChange={(event) => onChange(event.target.value)}
+      spellCheck={false}
+      autoCapitalize="off"
+      autoCorrect="off"
+    />
   );
 }
 

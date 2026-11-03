@@ -24,6 +24,8 @@ fn request(collection: &str, select: Option<&[&str]>) -> QueryRequest {
         page: 0,
         page_size: 50,
         select: select.map(|paths| paths.iter().map(|p| p.to_string()).collect()),
+        except: Vec::new(),
+        hint: None,
     }
 }
 
@@ -98,6 +100,7 @@ fn a_chosen_nested_path_sorts_and_filters_as_ever() {
             value_type: ValueType::String,
             text: "Cy".into(),
         }),
+        ..Default::default()
     }]);
     let result = fixture.session.query(&asked).unwrap();
     assert_eq!(result.total, 2);
@@ -136,6 +139,7 @@ fn chosen_index_fields_are_shown_from_the_entries() {
             value_type: ValueType::String,
             text: "done".into(),
         }),
+        ..Default::default()
     }]);
     let report = fixture.session.explain(&asked).unwrap();
     let direct = fixture
@@ -182,5 +186,37 @@ fn a_path_that_names_no_field_is_refused() {
             .explain(&request("people", Some(select)))
             .unwrap_err();
         assert_eq!(error.category, ErrorCategory::InvalidInput);
+    }
+}
+
+/// Hidden fields (trunkdb SPEC §143): whole documents without them,
+/// a nested one taken out of its object; the rest in stored order.
+#[test]
+fn hidden_fields_are_left_out_of_whole_documents() {
+    let fixture = people();
+    let mut asked = request("people", None);
+    asked.except = vec!["bio".into(), "address.zip".into(), "bio".into()];
+    let result = fixture.session.query(&asked).unwrap();
+    assert_eq!(result.except, ["bio", "address.zip"]);
+    assert_eq!(result.select, None);
+    assert_eq!(result.columns, ["_id", "address", "name", "note", "tags"]);
+    let ann = &result.rows[0];
+    assert!(!ann.cells.contains_key("bio"));
+    assert_eq!(ann.cells["address"].preview, r#"{"city":"Bonn"}"#);
+    assert!(!ann.json.contains("53111") && !ann.json.contains("long"));
+    let command = fixture.session.find_command(&asked).unwrap();
+    assert!(command.contains("except"), "{command}");
+
+    for (except, select, problem) in [
+        (vec!["_id"], None, "_id always comes"),
+        (vec!["tags[*].city"], None, "itself"),
+        (vec![""], None, "enter a field path"),
+        (vec!["bio"], Some(vec!["name".to_string()]), "not both"),
+    ] {
+        asked.except = except.into_iter().map(String::from).collect();
+        asked.select = select;
+        let error = fixture.session.query(&asked).expect_err(problem);
+        assert_eq!(error.category, ErrorCategory::InvalidInput);
+        assert!(error.message.contains(problem), "{}", error.message);
     }
 }

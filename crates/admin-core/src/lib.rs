@@ -25,7 +25,7 @@ mod storage;
 
 pub use documents::{DocumentView, SaveRequest, SavedDocument};
 pub use error::{AppError, AppResult, ErrorCategory, TextPosition};
-pub use explain::{ExplainReport, IndexReadReport, PlanKind, SortReport};
+pub use explain::{AlternativeReport, ExplainReport, IndexReadReport, PlanKind, SortReport};
 pub use field_paths::{FieldPath, FieldPaths, FieldPathsRequest, KindCount, MAX_PATHS};
 pub use filter_text::{FilterRows, filter_to_rows, filter_to_text};
 pub use groups::{
@@ -37,8 +37,8 @@ pub use maintenance::{CheckReport, CompactReport, ExportSummary};
 pub use overview::{CollectionSummary, IndexSummary, Overview};
 pub use preferences::{Appearance, Preferences};
 pub use query::{
-    Cell, ConditionInput, FilterInput, Operator, QueryRequest, QueryResult, ResultRow, SortInput,
-    ValueInput, ValueKind, ValueType,
+    Cell, ConditionInput, FilterInput, HintInput, KindInput, Operator, QueryRequest, QueryResult,
+    ResultRow, SortInput, ValueInput, ValueKind, ValueType,
 };
 pub use recent::{RecentFile, RecentFiles};
 pub use session::{FileInfo, Session, SessionInfo, SessionManager, TrunkdbBuild};

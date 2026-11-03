@@ -22,6 +22,13 @@ pub enum ColumnKind {
     Avg,
     Min,
     Max,
+    /// How many different values, null and missing not counted
+    /// (trunkdb SPEC §146).
+    CountDistinct,
+    /// The value in the group's first document, by ID or by `by`.
+    First,
+    /// The value in the group's last document, by ID or by `by`.
+    Last,
 }
 
 /// A column besides the count, which every group has.
@@ -36,6 +43,10 @@ pub struct ColumnInput {
     /// of them. The groups and the other columns still see every one.
     #[serde(default)]
     pub condition: String,
+    /// The field that orders the group's documents for `first` and
+    /// `last`; empty: by ID, the order they were made in.
+    #[serde(default)]
+    pub by: String,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -52,6 +63,11 @@ pub struct GroupRequest {
     pub collection: String,
     /// The documents to group, as the list's filter has them.
     pub filter: FilterInput,
+    /// Arrays each matching document is made one per element of, in
+    /// order, before grouping (trunkdb SPEC §147): `items`, and
+    /// `items.sku` names a field of one element.
+    #[serde(default)]
+    pub unwind: Vec<String>,
     /// In order; empty: one group of every matching document.
     pub group_by: Vec<String>,
     /// After the count.
@@ -145,6 +161,23 @@ impl GroupRequest {
         let mut chain = Vec::new();
         let mut paths = Vec::new();
         let mut columns = Vec::new();
+        for (n, path) in self.unwind.iter().enumerate() {
+            let problem = match path_problem(path) {
+                Some(problem) => Some(problem.to_string()),
+                None if self.unwind[..n].contains(path) => {
+                    Some(format!("\u{201c}{path}\u{201d} is unwound already."))
+                }
+                None => None,
+            };
+            if let Some(problem) = problem {
+                return Err(AppError::invalid_input(format!(
+                    "Unwind {}: {problem}",
+                    n + 1
+                )));
+            }
+            aggregate = aggregate.unwind(path.clone());
+            chain.push(format!(".unwind({})", rust_str(path)));
+        }
         for (n, path) in self.group_by.iter().enumerate() {
             if let Some(problem) = path_problem(path) {
                 return Err(AppError::invalid_input(format!(
@@ -183,6 +216,7 @@ impl GroupRequest {
             kind: ColumnKind::Count,
             field: String::new(),
             condition: String::new(),
+            by: String::new(),
         })
         .chain(self.columns.iter().cloned());
         for (n, column) in wanted.enumerate() {
@@ -192,6 +226,20 @@ impl GroupRequest {
                 && let Some(problem) = path_problem(field)
             {
                 return Err(AppError::invalid_input(format!("Column {n}: {problem}")));
+            }
+            let ordered = matches!(column.kind, ColumnKind::First | ColumnKind::Last);
+            let by = column.by.as_str();
+            if !by.is_empty() {
+                if !ordered {
+                    return Err(AppError::invalid_input(format!(
+                        "Column {n}: only first and last are ordered by a field."
+                    )));
+                }
+                if let Some(problem) = path_problem(by) {
+                    return Err(AppError::invalid_input(format!(
+                        "Column {n}, ordered by: {problem}"
+                    )));
+                }
             }
             // Read as a filter is, so the column says where in
             // its own text the mistake is, not the list's filter.
@@ -208,6 +256,15 @@ impl GroupRequest {
                 ColumnKind::Avg => (format!("average {field}"), aggregate.avg(field)),
                 ColumnKind::Min => (format!("min {field}"), aggregate.min(field)),
                 ColumnKind::Max => (format!("max {field}"), aggregate.max(field)),
+                ColumnKind::CountDistinct => {
+                    (format!("distinct {field}"), aggregate.count_distinct(field))
+                }
+                ColumnKind::First => (format!("first {field}"), aggregate.first(field)),
+                ColumnKind::Last => (format!("last {field}"), aggregate.last(field)),
+            };
+            let (label, unnamed) = match by.is_empty() {
+                true => (label, unnamed),
+                false => (format!("{label} by {by}"), unnamed.by(by)),
             };
             chain.push(match column.kind {
                 ColumnKind::Count => ".count()".to_string(),
@@ -215,7 +272,13 @@ impl GroupRequest {
                 ColumnKind::Avg => format!(".avg({})", rust_str(field)),
                 ColumnKind::Min => format!(".min({})", rust_str(field)),
                 ColumnKind::Max => format!(".max({})", rust_str(field)),
+                ColumnKind::CountDistinct => format!(".count_distinct({})", rust_str(field)),
+                ColumnKind::First => format!(".first({})", rust_str(field)),
+                ColumnKind::Last => format!(".last({})", rust_str(field)),
             });
+            if !by.is_empty() {
+                chain.push(format!(".by({})", rust_str(by)));
+            }
             // trunkdb ANDs a column's conditions, as their text does.
             if !condition.is_empty() {
                 let text = print(condition.clone());
@@ -286,11 +349,15 @@ impl Session {
                 let values: Vec<&Document> = (built.paths.iter())
                     .map(|path| value_at(row, path))
                     .collect();
-                let (documents, no_documents) =
-                    match drill(&request.filter, &request.group_by, &values[..groups]) {
-                        Ok(conditions) => (Some(conditions), None),
-                        Err(why) => (None, Some(why)),
-                    };
+                let (documents, no_documents) = match drill(
+                    &request.filter,
+                    &request.unwind,
+                    &request.group_by,
+                    &values[..groups],
+                ) {
+                    Ok(conditions) => (Some(conditions), None),
+                    Err(why) => (None, Some(why)),
+                };
                 GroupRow {
                     cells: values.into_iter().map(Cell::new).collect(),
                     documents,
@@ -319,14 +386,44 @@ impl Session {
                 .collection::<Document>(&request.collection)
                 .explain_aggregate(conditions, &built.aggregate)?)
         })?;
-        Ok(ExplainReport::new(
-            request.request_id,
-            0,
-            0,
-            explained,
-            true,
-        ))
+        Ok(ExplainReport::build(request.request_id, 0, 0, explained, true).report)
     }
+}
+
+/// Group fields as a filter finds them in the documents before they
+/// were unwound: a field of an unwound array's element is one of any
+/// element, `items.sku` is `items[*].sku`. Two fields of one element
+/// would need `has`, which rows can't say: no filter then.
+fn unwound_paths(unwind: &[String], fields: &[String]) -> Result<Vec<String>, String> {
+    let mut seen: Vec<String> = Vec::new();
+    let mut paths = Vec::with_capacity(fields.len());
+    for field in fields {
+        let steps: Vec<&str> = field.split('.').collect();
+        let mut path = String::new();
+        let mut innermost = None;
+        for (at, step) in steps.iter().enumerate() {
+            if at > 0 {
+                path.push('.');
+            }
+            path.push_str(step);
+            let prefix = steps[..=at].join(".");
+            if unwind.contains(&prefix) {
+                path.push_str("[*]");
+                innermost = Some(prefix);
+            }
+        }
+        if let Some(array) = innermost {
+            if seen.contains(&array) {
+                return Err(format!(
+                    "Two group fields are of one element of \u{201c}{array}\u{201d}, \
+                     which a filter can't find together."
+                ));
+            }
+            seen.push(array);
+        }
+        paths.push(path);
+    }
+    Ok(paths)
 }
 
 /// The value at a dotted `path` of a row; a row holds every one.
@@ -351,9 +448,11 @@ fn value_at<'a>(row: &'a Document, path: &str) -> &'a Document {
 /// only text can write; rows have no such type.
 fn drill(
     filter: &FilterInput,
+    unwind: &[String],
     fields: &[String],
     values: &[&Document],
 ) -> Result<FilterInput, String> {
+    let fields = unwound_paths(unwind, fields)?;
     for (field, value) in fields.iter().zip(values) {
         if matches!(value, Document::Float(f) if f.is_nan()) {
             return Err(format!(
@@ -375,6 +474,7 @@ fn drill(
                     field: field.clone(),
                     operator: Operator::Eq,
                     value: Some(value),
+                    ..ConditionInput::default()
                 });
             }
             Ok(FilterInput::Rows(all))

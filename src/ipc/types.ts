@@ -113,10 +113,30 @@ export const OPERATORS = [
   "gt",
   "gte",
   "contains",
+  "starts_with",
+  "in",
+  "not_in",
   "exists",
   "missing",
+  "is_kind",
+  "is_not_kind",
 ] as const;
 export type Operator = (typeof OPERATORS)[number];
+
+/** A kind of value for `is_kind`, as trunkdb's filter text names it (its SPEC §159). */
+export const KINDS = [
+  "string",
+  "int",
+  "float",
+  "number",
+  "bool",
+  "date",
+  "id",
+  "array",
+  "object",
+  "binary",
+] as const;
+export type Kind = (typeof KINDS)[number];
 
 export const VALUE_TYPES = ["string", "int", "float", "bool", "null", "date_time", "id"] as const;
 export type ValueType = (typeof VALUE_TYPES)[number];
@@ -130,8 +150,12 @@ export interface ValueInput {
 export interface ConditionInput {
   field: string;
   operator: Operator;
-  /** null for exists and missing. */
+  /** The value of a comparison, contains and starts_with; null otherwise. */
   value: ValueInput | null;
+  /** The values of in and not_in, all of one type; absent otherwise. */
+  values?: ValueInput[];
+  /** The kind of is_kind and is_not_kind; absent otherwise. */
+  kind?: Kind;
 }
 
 /**
@@ -143,6 +167,12 @@ export type FilterInput = { rows: ConditionInput[] } | { text: string };
 
 /** Filter text taken back into rows, or why it can't be. */
 export type FilterRows = { rows: ConditionInput[] } | { reason: string };
+
+/**
+ * Which index the page is read by (trunkdb SPEC §132), where trunkdb's
+ * rules would read another or none. The rows are the same with any hint.
+ */
+export type HintInput = { kind: "index"; fields: string[] } | { kind: "no_index" };
 
 export interface SortInput {
   field: string;
@@ -159,6 +189,10 @@ export interface QueryRequest {
   page_size: number;
   /** The fields to read and show, as paths (trunkdb SPEC §106); `_id` comes too. null: whole documents. */
   select: string[] | null;
+  /** Fields left out of whole documents (trunkdb SPEC §143); empty: none. Not with `select`. */
+  except: string[];
+  /** The index the page is read by; null: trunkdb's choice. Not for the count. */
+  hint: HintInput | null;
 }
 
 export type ValueKind =
@@ -199,9 +233,12 @@ export interface QueryResult {
   columns: string[];
   /** The chosen fields the rows hold, checked and without repeats; null: whole documents. */
   select: string[] | null;
+  /** The fields left out of the rows, checked and without repeats. */
+  except: string[];
 }
 
-export type ColumnKind = "count" | "sum" | "avg" | "min" | "max";
+export type ColumnKind =
+  "count" | "sum" | "avg" | "min" | "max" | "count_distinct" | "first" | "last";
 
 /** A column besides the count, which every group has. */
 export interface ColumnInput {
@@ -214,6 +251,8 @@ export interface ColumnInput {
    * columns still see every document.
    */
   condition: string;
+  /** The field ordering the group's documents for first and last; empty: by ID. */
+  by: string;
 }
 
 export interface GroupSort {
@@ -228,6 +267,11 @@ export interface GroupRequest {
   collection: string;
   /** The documents to group: the list's applied filter. */
   filter: FilterInput;
+  /**
+   * Arrays each document is made one per element of, in order, before
+   * grouping (trunkdb SPEC §147); `items.sku` then names a field of one element.
+   */
+  unwind: string[];
   /** In order; empty: one group of every matching document. */
   group_by: string[];
   /** After the count. */
@@ -371,9 +415,28 @@ export interface IndexReadReport {
 }
 
 /** How a page was read (trunkdb SPEC §94). */
+/** A plan trunkdb passed over (its SPEC §133): what the query, hinted to it, would read. */
+export interface AlternativeReport {
+  plan: PlanKind;
+  /** The indexes it reads; empty for a scan and a lookup by ID. */
+  indexes: string[];
+  /** Index entries it would read, every read together. */
+  entries: number;
+  /** `entries` is a lower bound: trunkdb stopped counting there. */
+  more_than: boolean;
+  /** It reads a document per entry to check it; false where the entries decide. */
+  reads_documents: boolean;
+  /** It would read fewer entries than the query did. */
+  fewer: boolean;
+  /** The hint that reads the page this way; null where none names it. */
+  hint: HintInput | null;
+}
+
 export interface ExplainReport {
   request_id: number;
   plan: PlanKind;
+  /** The plan is the one the request's hint asked for. */
+  hinted: boolean;
   reads: IndexReadReport[];
   /** Sort keys from the index order and sorted in memory. */
   sort: { from_index: number; in_memory: number } | null;
@@ -389,6 +452,8 @@ export interface ExplainReport {
   /** The groups made, for groups (trunkdb SPEC §107.6); null for a page of documents. */
   groups: number | null;
   elapsed_micros: number;
+  /** The plans passed over, for a page of documents; empty for groups. */
+  alternatives: AlternativeReport[];
 }
 
 export interface CheckReport {

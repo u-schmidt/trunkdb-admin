@@ -90,8 +90,9 @@ describe("groups", () => {
       request_id: expect.any(Number) as number,
       collection: "tasks",
       filter: { rows: [] },
+      unwind: [],
       group_by: ["status"],
-      columns: [{ kind: "avg", field: "tries", condition: "" }],
+      columns: [{ kind: "avg", field: "tries", condition: "", by: "" }],
       sort: null,
       page: 0,
       page_size: 50,
@@ -122,13 +123,53 @@ describe("groups", () => {
     await user.click(screen.getByRole("button", { name: "Run groups" }));
 
     expect(lastGroups(backend).columns).toEqual([
-      { kind: "count", field: "", condition: "tries > 3" },
+      { kind: "count", field: "", condition: "tries > 3", by: "" },
     ]);
     const table = await groupTable();
     const headers = within(table)
       .getAllByRole("columnheader")
       .map((th) => th.textContent);
     expect(headers).toEqual(["status", "count", "count where tries > 3", "Documents"]);
+  });
+
+  it("sends unwound arrays, and an order for first and last only", async () => {
+    const backend = backendWith();
+    const user = await openGroups(backend);
+    await user.click(screen.getByRole("button", { name: "Add unwind" }));
+    await user.type(screen.getByLabelText("Unwind 1"), "items");
+    await user.type(screen.getByLabelText("Group field 1"), "items.sku");
+    await user.click(screen.getByRole("button", { name: "Add column" }));
+    await user.selectOptions(screen.getByLabelText("Column 1 kind"), "last");
+    await user.type(screen.getByLabelText("Column 1 field"), "status");
+    await user.type(screen.getByLabelText("Column 1 order"), "created");
+    await user.click(screen.getByRole("button", { name: "Add column" }));
+    await user.selectOptions(screen.getByLabelText("Column 2 kind"), "first");
+    await user.type(screen.getByLabelText("Column 2 field"), "tries");
+    await user.type(screen.getByLabelText("Column 2 order"), "created");
+    // No longer first or last: the order is hidden and not sent.
+    await user.selectOptions(screen.getByLabelText("Column 2 kind"), "count_distinct");
+    expect(screen.queryByLabelText("Column 2 order")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Run groups" }));
+
+    expect(lastGroups(backend)).toMatchObject({
+      unwind: ["items"],
+      group_by: ["items.sku"],
+      columns: [
+        { kind: "last", field: "status", condition: "", by: "created" },
+        { kind: "count_distinct", field: "tries", condition: "", by: "" },
+      ],
+    });
+    const table = await groupTable();
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((th) => th.textContent);
+    expect(headers).toEqual([
+      "items.sku",
+      "count",
+      "last status by created",
+      "distinct tries",
+      "Documents",
+    ]);
   });
 
   it("sorts by a header in the backend: the biggest groups first, then reversed", async () => {

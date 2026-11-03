@@ -18,6 +18,8 @@ fn list(filter: FilterInput) -> QueryRequest {
         page: 2,
         page_size: 50,
         select: None,
+        except: Vec::new(),
+        hint: None,
     }
 }
 
@@ -30,6 +32,7 @@ fn the_list_is_its_count_and_its_page() {
             value_type: ValueType::String,
             text: "soup".to_string(),
         }),
+        ..Default::default()
     }]);
     assert_eq!(
         query_statement(&list(soup)).unwrap(),
@@ -59,17 +62,20 @@ fn the_groups_are_their_aggregate_built_call_by_call() {
         request_id: 1,
         collection: "recipes".to_string(),
         filter: FilterInput::Text(r#"category = "soup""#.to_string()),
+        unwind: Vec::new(),
         group_by: vec!["cuisine".to_string()],
         columns: vec![
             ColumnInput {
                 kind: ColumnKind::Count,
                 field: String::new(),
                 condition: r#"ingredients[*] = "Tomatoes""#.to_string(),
+                by: String::new(),
             },
             ColumnInput {
                 kind: ColumnKind::Avg,
                 field: "minutes".to_string(),
                 condition: String::new(),
+                by: String::new(),
             },
         ],
         sort: Some(GroupSort {
@@ -108,6 +114,7 @@ fn what_wouldnt_run_has_no_statement() {
         request_id: 1,
         collection: "recipes".to_string(),
         filter: FilterInput::default(),
+        unwind: Vec::new(),
         group_by: vec![String::new()],
         columns: Vec::new(),
         sort: None,

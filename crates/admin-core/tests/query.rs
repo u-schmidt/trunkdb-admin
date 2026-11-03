@@ -24,6 +24,8 @@ fn request(collection: &str) -> QueryRequest {
         page: 0,
         page_size: 50,
         select: None,
+        except: Vec::new(),
+        hint: None,
     }
 }
 
@@ -35,6 +37,7 @@ fn condition(field: &str, operator: Operator, value: Option<(ValueType, &str)>) 
             value_type,
             text: text.to_string(),
         }),
+        ..Default::default()
     }
 }
 

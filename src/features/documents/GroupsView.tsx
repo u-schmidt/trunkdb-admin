@@ -20,7 +20,13 @@ const COLUMN_LABELS: Record<ColumnInput["kind"], string> = {
   avg: "Average",
   min: "Minimum",
   max: "Maximum",
+  count_distinct: "Distinct values",
+  first: "First value",
+  last: "Last value",
 };
+
+/** Columns that take an order: the value of the first or last document. */
+const isOrdered = (kind: ColumnInput["kind"]) => kind === "first" || kind === "last";
 
 const MAX_GROUP_FIELDS = 3;
 const GROUPS = ["group", "groups"] as const;
@@ -36,6 +42,8 @@ interface Column {
   field: string;
   /** trunkdb filter text; empty: every document of the group. */
   condition: string;
+  /** For first and last: the field ordering the group; empty: by ID. */
+  by: string;
 }
 
 interface Props {
@@ -56,6 +64,7 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
   // Suggestions from the collection's documents.
   const paths = useFieldPaths();
   const { result, applied, loading, error } = groups;
+  const [unwinds, setUnwinds] = useState<Field[]>([]);
   const [fields, setFields] = useState<Field[]>([{ key: 0, path: "" }]);
   const [columns, setColumns] = useState<Column[]>([]);
   const nextKey = useRef(1);
@@ -63,8 +72,15 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
 
   const pageSize = applied?.settings.pageSize ?? 50;
   const settings = (): GroupSettings => ({
+    unwind: unwinds.map((unwind) => unwind.path),
     groupBy: fields.map((field) => field.path),
-    columns: columns.map(({ kind, field, condition }) => ({ kind, field, condition })),
+    columns: columns.map(({ kind, field, condition, by }) => ({
+      kind,
+      field,
+      condition,
+      // Only first and last are ordered; a hidden order isn't sent.
+      by: isOrdered(kind) ? by : "",
+    })),
     // The columns may have changed: the group order again.
     sort: null,
     pageSize,
@@ -87,8 +103,48 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
       <form className="filter group-form" onSubmit={submit} aria-label="Group by">
         <p className="muted">
           Counts the documents the filter finds, per value of the fields below. A missing field is
-          counted with null. A column with a condition takes in only the documents it finds.
+          counted with null. A column with a condition takes in only the documents it finds. Unwind
+          an array to count its elements: each document becomes one per element, and{" "}
+          <code>items.sku</code> names a field of that element.
         </p>
+        {unwinds.length > 0 && (
+          <ol className="filter-rows">
+            {unwinds.map((unwind, index) => (
+              <li key={unwind.key} className="filter-row">
+                <span className="filter-joiner">{index === 0 ? "Unwind" : "then"}</span>
+                <input
+                  type="text"
+                  className="filter-field"
+                  aria-label={`Unwind ${index + 1}`}
+                  placeholder="array field, e.g. items"
+                  value={unwind.path}
+                  list={paths.listPlain}
+                  onFocus={paths.ensure}
+                  onChange={(event) =>
+                    setUnwinds((current) =>
+                      current.map((u) =>
+                        u.key === unwind.key ? { ...u, path: event.target.value } : u,
+                      ),
+                    )
+                  }
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                />
+                <button
+                  type="button"
+                  className="quiet"
+                  aria-label={`Remove unwind ${index + 1}`}
+                  onClick={() =>
+                    setUnwinds((current) => current.filter((u) => u.key !== unwind.key))
+                  }
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
         {fields.length === 0 ? (
           <p className="muted">No group fields: all matching documents are one group.</p>
         ) : (
@@ -170,6 +226,25 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
                     />
                   </>
                 )}
+                {isOrdered(column.kind) && (
+                  <>
+                    <span>ordered by</span>
+                    <input
+                      type="text"
+                      className="filter-field"
+                      aria-label={`Column ${n} order`}
+                      title="The field that orders the group's documents; empty: by ID, the order they were made in"
+                      placeholder="_id (as made)"
+                      value={column.by}
+                      list={paths.listPlain}
+                      onFocus={paths.ensure}
+                      onChange={(event) => change({ by: event.target.value })}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                    />
+                  </>
+                )}
                 <span>where</span>
                 <input
                   type="text"
@@ -200,6 +275,15 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
         <div className="filter-footer">
           <button
             type="button"
+            title="Count the elements of an array: each document becomes one per element"
+            onClick={() =>
+              setUnwinds((current) => [...current, { key: nextKey.current++, path: "" }])
+            }
+          >
+            Add unwind
+          </button>
+          <button
+            type="button"
             disabled={fields.length >= MAX_GROUP_FIELDS}
             onClick={() =>
               setFields((current) => [...current, { key: nextKey.current++, path: "" }])
@@ -212,7 +296,7 @@ export function GroupsView({ groups, onShowDocuments, onRun, settingsRef }: Prop
             onClick={() =>
               setColumns((current) => [
                 ...current,
-                { key: nextKey.current++, kind: "sum", field: "", condition: "" },
+                { key: nextKey.current++, kind: "sum", field: "", condition: "", by: "" },
               ])
             }
           >
@@ -271,10 +355,15 @@ function CellValue({ cell }: { cell: Cell }) {
   );
 }
 
+/** Right-aligned: the computed columns, except a value taken from a document. */
+function isNumeric(column: GroupColumn): boolean {
+  return !column.group && column.kind !== null && !isOrdered(column.kind);
+}
+
 /** The first click on a count sorts the biggest groups first; others start ascending. */
 function nextSort(column: GroupColumn, at: number, current: GroupSort | null): GroupSort {
   if (current?.column === at) return { column: at, descending: !current.descending };
-  return { column: at, descending: column.kind === "count" };
+  return { column: at, descending: column.kind === "count" || column.kind === "count_distinct" };
 }
 
 function GroupTable({
@@ -299,7 +388,7 @@ function GroupTable({
                 <th
                   key={at}
                   scope="col"
-                  className={column.group ? undefined : "numeric"}
+                  className={isNumeric(column) ? "numeric" : undefined}
                   aria-sort={current ? (sort.descending ? "descending" : "ascending") : undefined}
                 >
                   <button
@@ -333,7 +422,11 @@ function GroupTable({
               {row.cells.map((cell, at) => (
                 <td
                   key={at}
-                  className={result.columns[at]?.group === false ? "numeric" : undefined}
+                  className={
+                    result.columns[at] !== undefined && isNumeric(result.columns[at])
+                      ? "numeric"
+                      : undefined
+                  }
                 >
                   <CellValue cell={cell} />
                 </td>

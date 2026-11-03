@@ -3,6 +3,23 @@
 What changed in each release of TrunkDB Admin, newest first. Each release is
 tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
+## Unreleased
+
+Catching up with what trunkdb 0.30.0 offers.
+
+- **Filter rows:** `starts with`, `is one of` / `is none of` (trunkdb's `in`
+  and `not in`), and `is of kind` / `is not of kind`; text with these turns
+  into rows and back.
+- **Index hints:** Explain lists the plans trunkdb passed over and how many
+  index entries each would read; Use reads the page that way, and the hint is
+  shown above the list until trunkdb is let choose again. The copied command
+  and the statement carry it.
+- **Groups:** distinct counts, the first or last value of a group (by ID or
+  ordered by a field), and unwinding arrays to count their elements; a group's
+  documents are those with such an element.
+- **Columns:** hide fields from whole documents instead of choosing the rest.
+- The browser preview's sample data names trunkdb 0.30.0.
+
 ## 0.1.0 — 2026-11-02
 
 The first public release, with trunkdb 0.30.0 (tag `v0.30.0`).

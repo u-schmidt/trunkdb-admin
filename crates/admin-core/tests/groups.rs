@@ -17,6 +17,7 @@ fn request(collection: &str, group_by: &[&str]) -> GroupRequest {
         request_id: 9,
         collection: collection.to_string(),
         filter: FilterInput::default(),
+        unwind: Vec::new(),
         group_by: group_by.iter().map(|s| s.to_string()).collect(),
         columns: Vec::new(),
         sort: None,
@@ -30,6 +31,7 @@ fn column(kind: ColumnKind, field: &str) -> ColumnInput {
         kind,
         field: field.to_string(),
         condition: String::new(),
+        by: String::new(),
     }
 }
 
@@ -41,6 +43,7 @@ fn condition(field: &str, operator: Operator, value_type: ValueType, text: &str)
             value_type,
             text: text.to_string(),
         }),
+        ..Default::default()
     }
 }
 
@@ -85,6 +88,8 @@ fn listed(fixture: &Fixture, collection: &str, filter: FilterInput) -> usize {
             page: 0,
             page_size: 1,
             select: None,
+            except: Vec::new(),
+            hint: None,
         })
         .unwrap()
         .total
@@ -452,6 +457,8 @@ fn explain_says_how_the_groups_were_made() {
             page: 0,
             page_size: 10,
             select: None,
+            except: Vec::new(),
+            hint: None,
         })
         .unwrap();
     assert_eq!(list.groups, None);
@@ -504,6 +511,7 @@ fn wrong_requests_and_a_closed_session_are_refused() {
 fn filtered(kind: ColumnKind, field: &str, condition: &str) -> ColumnInput {
     ColumnInput {
         condition: condition.to_string(),
+        by: String::new(),
         ..column(kind, field)
     }
 }
@@ -607,4 +615,140 @@ fn a_condition_that_doesnt_read_names_its_column() {
     assert!(error.at.is_none());
     let error = fixture.session.explain_groups(&ask).unwrap_err();
     assert_eq!(error.category, ErrorCategory::InvalidInput);
+}
+
+fn ordered(kind: ColumnKind, field: &str, by: &str) -> ColumnInput {
+    ColumnInput {
+        by: by.to_string(),
+        ..column(kind, field)
+    }
+}
+
+/// `count distinct`, `first` and `last` (trunkdb SPEC §146), the last
+/// two by ID or by a field.
+#[test]
+fn distinct_first_and_last_columns() {
+    let fixture = tasks();
+    let mut asked = request("tasks", &["status"]);
+    asked.columns = vec![
+        column(ColumnKind::CountDistinct, "tenant"),
+        column(ColumnKind::First, "tries"),
+        column(ColumnKind::Last, "tries"),
+        ordered(ColumnKind::First, "tenant", "tries"),
+        ordered(ColumnKind::Last, "tenant", "tries"),
+    ];
+    let result = fixture.session.groups(&asked).unwrap();
+    let labels: Vec<&str> = result.columns.iter().map(|c| c.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "status",
+            "count",
+            "distinct tenant",
+            "first tries",
+            "last tries",
+            "first tenant by tries",
+            "last tenant by tries"
+        ]
+    );
+    // Groups in value order: done, queued, running. Queued is task 0, 3,
+    // 6 … 297: the first by ID has 0 tries, the last 297 % 7 = 3; by
+    // tries, the first with 0 is task 0 (t0), the last with 6 task 279.
+    assert_eq!(
+        previews(&result)[1],
+        ["queued", "100", "10", "0", "3", "t0", "t9"]
+    );
+    let statement = trunkdb_admin_core::groups_statement(&asked).unwrap();
+    assert!(
+        statement.contains(".count_distinct(\"tenant\")"),
+        "{statement}"
+    );
+    assert!(
+        statement.contains(".first(\"tenant\")\n    .by(\"tries\")"),
+        "{statement}"
+    );
+
+    asked.columns = vec![ordered(ColumnKind::Sum, "tries", "created")];
+    let error = fixture
+        .session
+        .groups(&asked)
+        .expect_err("sum has no order");
+    assert_eq!(error.category, ErrorCategory::InvalidInput);
+    assert!(
+        error.message.contains("only first and last"),
+        "{}",
+        error.message
+    );
+}
+
+/// 3 orders with items, one with none and one without the field.
+fn orders() -> Fixture {
+    let fixture = Fixture::new();
+    fixture.insert(
+        "orders",
+        &[
+            r#"{"items": [{"sku": "A1", "qty": 3}, {"sku": "B2", "qty": 1}], "tags": ["x", "y"]}"#,
+            r#"{"items": [{"sku": "A1", "qty": 2}], "tags": ["x"]}"#,
+            r#"{"items": [{"sku": "C3", "qty": 4}]}"#,
+            r#"{"items": []}"#,
+            r#"{"other": 1}"#,
+        ],
+    );
+    fixture
+}
+
+/// Unwound (trunkdb SPEC §147): one per element, a group field of the
+/// element; a group's documents are those with such an element.
+#[test]
+fn unwound_arrays_group_their_elements_and_find_their_documents() {
+    let fixture = orders();
+    let mut asked = request("orders", &["items.sku"]);
+    asked.unwind = vec!["items".into()];
+    asked.columns = vec![column(ColumnKind::Sum, "items.qty")];
+    let result = fixture.session.groups(&asked).unwrap();
+    assert_eq!(
+        previews(&result),
+        [["A1", "2", "5"], ["B2", "1", "1"], ["C3", "1", "4"]]
+    );
+    assert_eq!(
+        result.rows[0].documents,
+        Some(FilterInput::Rows(vec![condition(
+            "items[*].sku",
+            Operator::Eq,
+            ValueType::String,
+            "A1"
+        )]))
+    );
+    drills_find_what_is_counted(&fixture, "orders", &result);
+    let statement = trunkdb_admin_core::groups_statement(&asked).unwrap();
+    assert!(
+        statement.contains(".unwind(\"items\")\n    .group_by(\"items.sku\")"),
+        "{statement}"
+    );
+
+    // An array of plain values: each value its own group.
+    let mut asked = request("orders", &["tags"]);
+    asked.unwind = vec!["tags".into()];
+    let result = fixture.session.groups(&asked).unwrap();
+    assert_eq!(previews(&result), [["x", "2"], ["y", "1"]]);
+    drills_find_what_is_counted(&fixture, "orders", &result);
+
+    // Two fields of one element can't be found together by rows.
+    let mut asked = request("orders", &["items.sku", "items.qty"]);
+    asked.unwind = vec!["items".into()];
+    let result = fixture.session.groups(&asked).unwrap();
+    assert!(result.rows.iter().all(|row| row.documents.is_none()));
+    assert!(
+        result.rows[0]
+            .no_documents
+            .as_deref()
+            .is_some_and(|why| why.contains("one element")),
+        "{:?}",
+        result.rows[0].no_documents
+    );
+
+    let mut asked = request("orders", &["items.sku"]);
+    asked.unwind = vec!["items".into(), "items".into()];
+    let error = fixture.session.groups(&asked).expect_err("twice");
+    assert!(error.message.starts_with("Unwind 2:"), "{}", error.message);
 }

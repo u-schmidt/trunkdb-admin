@@ -6,12 +6,17 @@ interface Row {
   path: string;
 }
 
+/** Show only the fields listed, or every field but those. */
+export type ColumnMode = "only" | "except";
+
 interface Props {
-  /** The paths to start from: the chosen ones, or the page's fields. */
+  /** The paths to start from: the chosen or hidden ones, or the page's fields. */
   initial: string[];
-  /** Whether fields are chosen now, so that All fields means something. */
+  initialMode?: ColumnMode;
+  /** Whether fields are chosen or hidden now, so that All fields means something. */
   choosing: boolean;
-  onChoose: (select: string[] | null) => void;
+  /** The fields to show, or null with the fields to hide (trunkdb SPEC §143). */
+  onChoose: (select: string[] | null, except: string[]) => void;
   onClose: () => void;
 }
 
@@ -20,7 +25,14 @@ interface Props {
  * ones included, in order. `_id` always comes; the backend checks the
  * paths.
  */
-export function ColumnChooser({ initial, choosing, onChoose, onClose }: Props) {
+export function ColumnChooser({
+  initial,
+  initialMode = "only",
+  choosing,
+  onChoose,
+  onClose,
+}: Props) {
+  const [mode, setMode] = useState<ColumnMode>(initialMode);
   // Suggestions from the collection's documents.
   const paths = useFieldPaths();
   const nextKey = useRef(initial.length);
@@ -39,14 +51,26 @@ export function ColumnChooser({ initial, choosing, onChoose, onClose }: Props) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onChoose(rows.map((row) => row.path));
+    const paths = rows.map((row) => row.path);
+    if (mode === "only") onChoose(paths, []);
+    else onChoose(null, paths);
   };
 
   return (
     <form className="filter column-chooser" onSubmit={submit} aria-label="Columns">
+      <div role="group" aria-label="Which fields" className="segmented">
+        <button type="button" aria-pressed={mode === "only"} onClick={() => setMode("only")}>
+          Only these
+        </button>
+        <button type="button" aria-pressed={mode === "except"} onClick={() => setMode("except")}>
+          All but these
+        </button>
+      </div>
       <p className="muted">
-        Only these fields are read and shown, nested paths such as address.city included; _id always
-        comes. Opening a document shows it whole.
+        {mode === "only"
+          ? "Only these fields are read and shown, nested paths such as address.city included; _id always comes."
+          : "Every field but these is read and shown, for one too large to page through; a nested path such as address.zip leaves the rest of its object."}{" "}
+        Opening a document shows it whole.
       </p>
       <ol className="filter-rows">
         {rows.map((row, index) => {
@@ -114,11 +138,11 @@ export function ColumnChooser({ initial, choosing, onChoose, onClose }: Props) {
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" disabled={!choosing} onClick={() => onChoose(null)}>
+          <button type="button" disabled={!choosing} onClick={() => onChoose(null, [])}>
             All fields
           </button>
           <button type="submit" className="primary">
-            Show these columns
+            {mode === "only" ? "Show these columns" : "Hide these fields"}
           </button>
         </span>
       </div>

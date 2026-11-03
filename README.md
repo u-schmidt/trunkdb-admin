@@ -16,15 +16,19 @@ made and tested on.
   statistics: pages by kind, sizes per collection, the write-ahead log, and
   what compacting would free.
 - **Browse** a collection as JSON or as a table, sorted and paged by trunkdb,
-  with the columns you choose.
-- **Filter** with typed rows, or with trunkdb's filter language as text
+  with the columns you choose, or every field but the ones you hide.
+- **Filter** with typed rows (comparisons, contains, starts with, one of a list
+  of values, a kind of value) or with trunkdb's filter language as text
   (`status = "open" and due < date("2026-12-01T00:00:00Z")`); copy the list as a
   `trunkdb find` command.
 - **Groups:** documents counted per value of up to three fields, with sums,
-  averages, minimums and maximums, each group's documents one click away.
-- **Explain** how trunkdb ran what is shown: the plan, each index read, and how
-  many entries and documents it read for how many shown. **Statement** shows
-  the same as the Rust calls that make it.
+  averages, minimums, maximums, distinct counts and first or last values;
+  arrays unwound to count their elements; each group's documents one click
+  away.
+- **Explain** how trunkdb ran what is shown: the plan, each index read, how
+  many entries and documents it read for how many shown, and what the plans it
+  passed over would have read, each one click away as an index hint.
+  **Statement** shows the same as the Rust calls that make it.
 - **Edit** documents in a JSON editor that never rewrites your text; insert,
   delete, and a question before any unsaved change is lost, quitting included.
 - **Indexes:** create single, compound, unique and sparse indexes; drop them.

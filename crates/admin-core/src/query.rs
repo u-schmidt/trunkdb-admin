@@ -6,12 +6,13 @@ use crate::error::{AppError, AppResult, ErrorCategory};
 use crate::session::Session;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use trunkdb::query::{Condition, Filter, Op, SortOrder};
+use trunkdb::query::{Condition, Filter, Kind, Op, SortOrder};
 use trunkdb::{DateTime, DocId, Document};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Operator {
+    #[default]
     Eq,
     Ne,
     Lt,
@@ -19,8 +20,69 @@ pub enum Operator {
     Gt,
     Gte,
     Contains,
+    /// A string beginning with the value, case counting (trunkdb SPEC §158).
+    StartsWith,
+    /// One of `values` (trunkdb SPEC §115).
+    In,
+    /// None of `values`: also where the field is missing.
+    NotIn,
     Exists,
     Missing,
+    /// The field holds a value of `kind` (trunkdb SPEC §159).
+    IsKind,
+    /// The field holds no value of `kind`: also where it is missing or null.
+    IsNotKind,
+}
+
+/// A kind of value for `is_kind`, as trunkdb's filter text names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KindInput {
+    Bool,
+    Int,
+    Float,
+    /// Int or Float.
+    Number,
+    String,
+    Binary,
+    Array,
+    Object,
+    Id,
+    Date,
+}
+
+impl KindInput {
+    fn kind(self) -> Kind {
+        match self {
+            KindInput::Bool => Kind::Bool,
+            KindInput::Int => Kind::Int,
+            KindInput::Float => Kind::Float,
+            KindInput::Number => Kind::Number,
+            KindInput::String => Kind::String,
+            KindInput::Binary => Kind::Binary,
+            KindInput::Array => Kind::Array,
+            KindInput::Object => Kind::Object,
+            KindInput::Id => Kind::Id,
+            KindInput::Date => Kind::DateTime,
+        }
+    }
+
+    /// The input for a trunkdb kind; None for a kind of a later trunkdb.
+    pub(crate) fn of(kind: Kind) -> Option<Self> {
+        Some(match kind {
+            Kind::Bool => KindInput::Bool,
+            Kind::Int => KindInput::Int,
+            Kind::Float => KindInput::Float,
+            Kind::Number => KindInput::Number,
+            Kind::String => KindInput::String,
+            Kind::Binary => KindInput::Binary,
+            Kind::Array => KindInput::Array,
+            Kind::Object => KindInput::Object,
+            Kind::Id => KindInput::Id,
+            Kind::DateTime => KindInput::Date,
+            _ => return None,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -46,12 +108,19 @@ pub struct ValueInput {
     pub text: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ConditionInput {
     pub field: String,
     pub operator: Operator,
-    /// Absent for `exists` and `missing`.
+    /// The value of a comparison, `contains` and `starts_with`; absent
+    /// otherwise.
     pub value: Option<ValueInput>,
+    /// The values of `in` and `not_in`, all of one type.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<ValueInput>,
+    /// The kind of `is_kind` and `is_not_kind`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<KindInput>,
 }
 
 /// The list's filter: rows of typed conditions, all to hold, or a
@@ -88,6 +157,28 @@ impl FilterInput {
     }
 }
 
+/// Which index the page query reads (trunkdb SPEC §132), where the
+/// planner's rules would read another or none. The results are the same
+/// with any hint; a hint that can't be followed fails the query.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum HintInput {
+    /// The index on these fields, in index order; `["_id"]` for the
+    /// primary index.
+    Index { fields: Vec<String> },
+    /// No index: every document read.
+    NoIndex,
+}
+
+impl HintInput {
+    fn apply(&self, filter: Filter) -> Filter {
+        match self {
+            HintInput::Index { fields } => filter.use_index(fields.clone()),
+            HintInput::NoIndex => filter.no_index(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct SortInput {
     pub field: String,
@@ -109,6 +200,14 @@ pub struct QueryRequest {
     /// always comes too. None: whole documents.
     #[serde(default)]
     pub select: Option<Vec<String>>,
+    /// Fields left out of whole documents (trunkdb SPEC §143), for one
+    /// too large to page through; empty: none. Not with `select`.
+    #[serde(default)]
+    pub except: Vec<String>,
+    /// The index the page is read by; None: the planner's choice. Not
+    /// for the count, which has no sort a hint could be for.
+    #[serde(default)]
+    pub hint: Option<HintInput>,
 }
 
 /// What kind of value a document or a table cell holds. Ordered as
@@ -166,6 +265,8 @@ pub struct QueryResult {
     pub columns: Vec<String>,
     /// The chosen fields the rows hold; None: whole documents.
     pub select: Option<Vec<String>>,
+    /// The fields left out of the rows, checked and without repeats.
+    pub except: Vec<String>,
 }
 
 impl QueryRequest {
@@ -186,13 +287,55 @@ impl QueryRequest {
             )));
         }
         let filter = self
-            .sorted(conditions)
+            .hinted(self.sorted(conditions))
             .skip(page * self.page_size)
             .limit(self.page_size);
-        Ok(match self.chosen()? {
+        let filter = match self.chosen()? {
             Some(paths) => filter.select(paths),
             None => filter,
+        };
+        let hidden = self.hidden()?;
+        Ok(match hidden.is_empty() {
+            true => filter,
+            false => filter.except(hidden),
         })
+    }
+
+    /// The fields to leave out, checked and without repeats.
+    pub(crate) fn hidden(&self) -> AppResult<Vec<String>> {
+        if self.except.is_empty() {
+            return Ok(Vec::new());
+        }
+        if self.select.is_some() {
+            return Err(AppError::invalid_input(
+                "Choose the fields to show or the fields to hide, not both.",
+            ));
+        }
+        let mut paths: Vec<String> = Vec::new();
+        for (n, path) in self.except.iter().enumerate() {
+            let problem = if path.is_empty() {
+                Some("enter a field path.".to_string())
+            } else if path == "_id" {
+                Some("_id always comes.".to_string())
+            } else if path.contains('[') {
+                let whole = path.split('[').next().unwrap_or(path);
+                Some(format!(
+                    "hide the array \u{201c}{whole}\u{201d} itself, whole."
+                ))
+            } else {
+                None
+            };
+            if let Some(problem) = problem {
+                return Err(AppError::invalid_input(format!(
+                    "Hidden field {}: {problem}",
+                    n + 1
+                )));
+            }
+            if !paths.contains(path) {
+                paths.push(path.clone());
+            }
+        }
+        Ok(paths)
     }
 
     /// The chosen paths, checked, without repeats and without `_id`,
@@ -226,6 +369,14 @@ impl QueryRequest {
             }
         }
         Ok(Some(paths))
+    }
+
+    /// `filter` with the request's hint, if it has one.
+    pub(crate) fn hinted(&self, filter: Filter) -> Filter {
+        match &self.hint {
+            Some(hint) => hint.apply(filter),
+            None => filter,
+        }
     }
 
     pub(crate) fn sorted(&self, filter: Filter) -> Filter {
@@ -262,6 +413,32 @@ impl ConditionInput {
         let op = match self.operator {
             Operator::Exists => return Ok(Condition::exists(field)),
             Operator::Missing => return Ok(Condition::missing(field)),
+            Operator::IsKind | Operator::IsNotKind => {
+                let kind = self.kind.ok_or("choose a kind of value.")?.kind();
+                let condition = Condition::is_kind(field, kind);
+                return Ok(match self.operator {
+                    Operator::IsNotKind => !condition,
+                    _ => condition,
+                });
+            }
+            Operator::In | Operator::NotIn => {
+                if self.values.is_empty() {
+                    return Err("enter at least one value.".into());
+                }
+                let values = (self.values.iter().enumerate())
+                    .map(|(n, value)| {
+                        value.parse().map_err(|problem| match self.values.len() {
+                            1 => problem,
+                            _ => format!("value {}: {problem}", n + 1),
+                        })
+                    })
+                    .collect::<Result<Vec<Document>, String>>()?;
+                let condition = Condition::is_in(field, values);
+                return Ok(match self.operator {
+                    Operator::NotIn => !condition,
+                    _ => condition,
+                });
+            }
             Operator::Eq => Op::Eq,
             Operator::Ne => Op::Ne,
             Operator::Lt => Op::Lt,
@@ -269,10 +446,19 @@ impl ConditionInput {
             Operator::Gt => Op::Gt,
             Operator::Gte => Op::Gte,
             Operator::Contains => Op::Contains,
+            Operator::StartsWith => Op::StartsWith,
         };
         let value = self.value.as_ref().ok_or("a value is required.")?;
-        if self.operator == Operator::Contains && value.value_type != ValueType::String {
-            return Err("\u{201c}contains\u{201d} takes a String value.".into());
+        if value.value_type != ValueType::String {
+            match self.operator {
+                Operator::Contains => {
+                    return Err("\u{201c}contains\u{201d} takes a String value.".into());
+                }
+                Operator::StartsWith => {
+                    return Err("\u{201c}starts with\u{201d} takes a String value.".into());
+                }
+                _ => {}
+            }
         }
         Ok(Condition::compare(field, op, value.parse()?))
     }
@@ -349,6 +535,7 @@ impl Session {
         // read.
         request.page_filter(conditions.clone(), 0)?;
         let chosen = request.chosen()?;
+        let hidden = request.hidden()?;
 
         self.read(|database| {
             let snapshot = database.snapshot()?;
@@ -378,6 +565,7 @@ impl Session {
                 columns,
                 rows,
                 select: chosen,
+                except: hidden,
             })
         })
     }

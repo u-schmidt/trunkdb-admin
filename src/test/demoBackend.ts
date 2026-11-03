@@ -8,6 +8,7 @@ import type {
   Overview,
   QueryRequest,
   ResultRow,
+  ValueInput,
   ValueKind,
 } from "../ipc/types";
 import {
@@ -80,25 +81,30 @@ const SYMBOLS: Record<string, string> = {
   gt: ">",
   gte: ">=",
   contains: "contains",
+  starts_with: "starts with",
 };
+
+/** A typed value in the filter language. */
+function showValue(value: ValueInput | null): string {
+  if (value === null || value.type === "null") return "null";
+  if (value.type === "string") return JSON.stringify(value.text);
+  if (value.type === "id") return `id("${value.text}")`;
+  if (value.type === "date_time") return `date("${value.text}")`;
+  return value.text;
+}
 
 function printRows(rows: ConditionInput[]): string {
   const text = rows
     .map((row) => {
       if (row.operator === "exists") return `exists(${row.field})`;
       if (row.operator === "missing") return `not exists(${row.field})`;
-      const value = row.value;
-      const shown =
-        value === null || value.type === "null"
-          ? "null"
-          : value.type === "string"
-            ? JSON.stringify(value.text)
-            : value.type === "id"
-              ? `id("${value.text}")`
-              : value.type === "date_time"
-                ? `date("${value.text}")`
-                : value.text;
-      return `${row.field} ${SYMBOLS[row.operator] ?? row.operator} ${shown}`;
+      if (row.operator === "is_kind") return `${row.field} is ${row.kind ?? "string"}`;
+      if (row.operator === "is_not_kind") return `${row.field} is not ${row.kind ?? "string"}`;
+      if (row.operator === "in" || row.operator === "not_in") {
+        const list = (row.values ?? []).map(showValue).join(", ");
+        return `${row.field} ${row.operator === "in" ? "in" : "not in"} (${list})`;
+      }
+      return `${row.field} ${SYMBOLS[row.operator] ?? row.operator} ${showValue(row.value)}`;
     })
     .join(" and ");
   printed.set(text, rows);
@@ -161,11 +167,39 @@ function drill(request: GroupRequest, values: Cell[]): FilterInput {
   return { text };
 }
 
+/** Roughly what trunkdb does, on the cells' previews; enough for a look at the layout. */
 function matches(row: ResultRow, condition: ConditionInput): boolean {
   const cell = row.cells[condition.field];
-  if (condition.operator === "exists") return cell !== undefined;
-  if (condition.operator === "missing") return cell === undefined;
-  return cell?.preview === condition.value?.text;
+  const preview = cell?.preview;
+  const text = condition.value?.text ?? "";
+  const kindOf = (kind: string | undefined) =>
+    cell !== undefined &&
+    (kind === "number"
+      ? cell.kind === "int" || cell.kind === "float"
+      : cell.kind === (kind === "date" ? "date_time" : kind));
+  const among = () => (condition.values ?? []).some((value) => value.text === preview);
+  switch (condition.operator) {
+    case "exists":
+      return cell !== undefined;
+    case "missing":
+      return cell === undefined;
+    case "ne":
+      return preview !== text;
+    case "contains":
+      return preview?.toLowerCase().includes(text.toLowerCase()) ?? false;
+    case "starts_with":
+      return preview?.startsWith(text) ?? false;
+    case "in":
+      return among();
+    case "not_in":
+      return !among();
+    case "is_kind":
+      return kindOf(condition.kind);
+    case "is_not_kind":
+      return !kindOf(condition.kind);
+    default:
+      return preview === text;
+  }
 }
 
 /** The cell at a dotted path: nested values are read from an object cell's preview. */
@@ -209,17 +243,18 @@ export function demoBackend(): Backend {
     [PATH, ...readOnlyPaths, "/Users/demo/old/gone.trunkdb"]
       .filter((path, at, all) => all.indexOf(path) === at)
       .map((path) => recentFile(path, !path.includes("gone"), readOnlyPaths.has(path)));
+  // As the storage report below has it: a file an older trunkdb made,
+  // which this one has written since.
+  const file = {
+    format_version: 12,
+    page_size: 8192,
+    pages: 214,
+    free_pages: 18,
+    created_by: "0.24.0",
+    written_by: "0.30.0",
+  };
   const overview = (): Overview => ({
-    // As the storage report below has it.
-    file: {
-      format_version: 12,
-      page_size: 8192,
-      pages: 214,
-      free_pages: 18,
-      // A file an older trunkdb made, which this one has written since.
-      created_by: null,
-      written_by: "0.24.0",
-    },
+    file,
     collections: [
       collection("empty", 0),
       { ...collection("mixed", mixed.length) },
@@ -238,7 +273,7 @@ export function demoBackend(): Backend {
   return {
     appInfo: async () => ({
       app_version: "0.1.0",
-      trunkdb: { version: "0.19.0", revision: "d422d3ed374a842a1d3cf50df95ed3a4c42f41a9" },
+      trunkdb: { version: "0.30.0", revision: "7cc7aa6f3cef59117fb485270c936fcce7ae4d98" },
     }),
     recentList: async () => recents(),
     recentRemove: async (path) => recents().filter((entry) => entry.path !== path),
@@ -258,7 +293,7 @@ export function demoBackend(): Backend {
       readOnly = asReadOnly;
       if (asReadOnly) readOnlyPaths.add(path);
       else readOnlyPaths.delete(path);
-      return { session: sessionInfo(path, "s1", asReadOnly), recent: recents() };
+      return { session: { ...sessionInfo(path, "s1", asReadOnly), file }, recent: recents() };
     },
     databaseCreate: async (path) => ({ session: sessionInfo(path), recent: [recentFile(path)] }),
     sessionClose: async () => undefined,
@@ -415,7 +450,18 @@ export function demoBackend(): Backend {
       const start = request.page * request.page_size;
       const page = ordered.slice(start, start + request.page_size);
       const select = request.select?.filter((path) => path !== "_id") ?? null;
-      const shown = select === null ? page : page.map((row) => chosen(row, select));
+      const hidden = request.except;
+      const shown =
+        select !== null
+          ? page.map((row) => chosen(row, select))
+          : hidden.length > 0
+            ? page.map((row) =>
+                chosen(
+                  row,
+                  Object.keys(row.cells).filter((f) => !hidden.includes(f)),
+                ),
+              )
+            : page;
       return later(resultFor({ ...request, select }, shown, all.length));
     },
     // Top-level fields only, grouped by their previews; a scan of every
@@ -448,6 +494,15 @@ export function demoBackend(): Backend {
           const columns: Cell[] = request.columns.map((column) => {
             const taken = members.filter((row) => meetsColumn(row, column.condition));
             if (column.kind === "count") return { kind: "int", preview: String(taken.length) };
+            if (column.kind === "count_distinct") {
+              const seen = new Set(taken.map((row) => row.cells[column.field]?.preview));
+              seen.delete(undefined);
+              return { kind: "int", preview: String(seen.size) };
+            }
+            if (column.kind === "first" || column.kind === "last") {
+              const at = column.kind === "first" ? taken[0] : taken[taken.length - 1];
+              return at?.cells[column.field] ?? null_;
+            }
             const found = numbers(taken, column.field);
             if (found.length === 0) return null_;
             const value =
@@ -582,11 +637,13 @@ export function demoBackend(): Backend {
       const conditions =
         "rows" in request.filter ? printRows(request.filter.rows) : request.filter.text.trim();
       const calls = [
+        ...request.unwind.map((field) => `.unwind("${field}")`),
         ...request.group_by.map((field) => `.group_by("${field}")`),
         ".count()",
         '.named("#0")',
         ...request.columns.flatMap((column, n) => [
           column.kind === "count" ? ".count()" : `.${column.kind}("${column.field}")`,
+          ...(column.by.trim() === "" ? [] : [`.by("${column.by.trim()}")`]),
           ...(column.condition.trim() === ""
             ? []
             : [`.filter(r#"${column.condition.trim()}"#.parse()?)`]),
@@ -630,6 +687,43 @@ export function demoBackend(): Backend {
         from_entries: 0,
         groups: null,
         elapsed_micros: 840,
+        hinted: request.hint !== null,
+        // What trunkdb passes over (its §133), roughly: a scan, the
+        // primary index, and the name index where people have one.
+        alternatives: [
+          {
+            plan: "scan" as const,
+            indexes: [],
+            // A scan walks the primary index: an entry per document.
+            entries: rows.length,
+            more_than: false,
+            reads_documents: true,
+            fewer: false,
+            hint: { kind: "no_index" as const },
+          },
+          {
+            plan: "index_order" as const,
+            indexes: ["_id"],
+            entries: Math.min(rows.length, skip + request.page_size),
+            more_than: false,
+            reads_documents: conditions.length > 0,
+            fewer: false,
+            hint: { kind: "index" as const, fields: ["_id"] },
+          },
+          ...(request.collection === "people"
+            ? [
+                {
+                  plan: "index" as const,
+                  indexes: ["name"],
+                  entries: rows.length,
+                  more_than: false,
+                  reads_documents: true,
+                  fewer: false,
+                  hint: { kind: "index" as const, fields: ["name"] },
+                },
+              ]
+            : []),
+        ],
       };
       // Entries decide where the filter names only the index's field
       // (trunkdb §100): documents are read only to be shown.

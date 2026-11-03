@@ -5,7 +5,7 @@
 //! the list's query as a `trunkdb find` command.
 
 use crate::error::{AppError, AppResult, TextPosition};
-use crate::query::{ConditionInput, Operator, QueryRequest, ValueInput};
+use crate::query::{ConditionInput, KindInput, Operator, QueryRequest, ValueInput};
 use crate::session::Session;
 use serde::Serialize;
 use trunkdb::Document;
@@ -13,7 +13,7 @@ use trunkdb::query::{Condition, Filter, Op, ParseFilterError};
 
 /// The clauses trunkdb's text has beyond a condition, which the list
 /// sets with controls of its own.
-const CLAUSES: [&str; 4] = ["select", "order", "limit", "offset"];
+const CLAUSES: [&str; 5] = ["select", "order", "limit", "offset", "use"];
 
 /// The conditions a text says, as `Filter::and` takes them: an `and` of
 /// several is several, as trunkdb's own parser has it (its §111.1). The
@@ -48,8 +48,8 @@ fn mistake(text: &str, error: &ParseFilterError) -> AppError {
         .iter()
         .any(|clause| word.eq_ignore_ascii_case(clause))
     {
-        "The filter text doesn't read. Sort, page size and columns are set with \
-         their own controls."
+        "The filter text doesn't read. Sort, page size, columns and the index are set \
+         with their own controls."
     } else {
         "The filter text doesn't read."
     };
@@ -111,15 +111,41 @@ fn collect(conditions: &[Condition], rows: &mut Vec<ConditionInput>) -> Result<(
 }
 
 fn row(condition: &Condition) -> Result<ConditionInput, String> {
-    let row = |field: &str, operator, value| ConditionInput {
+    let row = |field: &str, operator| ConditionInput {
         field: field.to_string(),
         operator,
-        value,
+        ..ConditionInput::default()
+    };
+    let kind_row = |field: &str, operator, kind: &trunkdb::query::Kind| {
+        let kind = KindInput::of(*kind).ok_or("a kind of a later trunkdb")?;
+        Ok(ConditionInput {
+            kind: Some(kind),
+            ..row(field, operator)
+        })
     };
     match condition {
-        Condition::Exists { field, .. } => Ok(row(field, Operator::Exists, None)),
+        Condition::Exists { field, .. } => Ok(row(field, Operator::Exists)),
+        Condition::IsKind { field, kind, .. } => kind_row(field, Operator::IsKind, kind),
         Condition::Not(inner) => match inner.as_ref() {
-            Condition::Exists { field, .. } => Ok(row(field, Operator::Missing, None)),
+            Condition::Exists { field, .. } => Ok(row(field, Operator::Missing)),
+            Condition::IsKind { field, kind, .. } => kind_row(field, Operator::IsNotKind, kind),
+            // A `not in` of one value prints so.
+            single @ Condition::Compare { op: Op::Eq, .. } => {
+                match in_values(std::slice::from_ref(single)).ok().flatten() {
+                    Some((field, values)) => Ok(ConditionInput {
+                        values,
+                        ..row(field, Operator::NotIn)
+                    }),
+                    None => Err("a `not`".into()),
+                }
+            }
+            Condition::Any(branches) => match in_values(branches)? {
+                Some((field, values)) => Ok(ConditionInput {
+                    values,
+                    ..row(field, Operator::NotIn)
+                }),
+                None => Err("a `not`".into()),
+            },
             _ => Err("a `not`".into()),
         },
         Condition::Compare {
@@ -134,18 +160,67 @@ fn row(condition: &Condition) -> Result<ConditionInput, String> {
                 Op::Gte => Operator::Gte,
                 Op::Contains if matches!(value, Document::String(_)) => Operator::Contains,
                 Op::Contains => return Err("`contains` with a value that isn't a string".into()),
-                Op::StartsWith => return Err("`starts with`".into()),
+                Op::StartsWith if matches!(value, Document::String(_)) => Operator::StartsWith,
+                Op::StartsWith => {
+                    return Err("`starts with` with a value that isn't a string".into());
+                }
                 _ => return Err("an operator rows don't offer".into()),
             };
             let value = ValueInput::of(value).map_err(|what| format!("{what} as a value"))?;
-            Ok(row(field, operator, Some(value)))
+            Ok(ConditionInput {
+                value: Some(value),
+                ..row(field, operator)
+            })
         }
-        Condition::Any(_) => Err("an `or` (or an `in`)".into()),
+        Condition::Any(branches) => match in_values(branches)? {
+            Some((field, values)) => Ok(ConditionInput {
+                values,
+                ..row(field, Operator::In)
+            }),
+            None => Err("an `or`".into()),
+        },
         Condition::Size { .. } => Err("`size(…)`".into()),
         Condition::ElemMatch { .. } => Err("`has`".into()),
-        Condition::IsKind { .. } => Err("a test of a value's kind (`is …`)".into()),
         _ => Err("a condition of a later trunkdb".into()),
     }
+}
+
+/// The field and values of an OR that is an `in` (trunkdb SPEC §115):
+/// an `=` per branch, all on one field. None for any other OR; an error
+/// for an `in` rows can't hold, its values of several types or of one
+/// rows have none for.
+fn in_values(branches: &[Condition]) -> Result<Option<(&str, Vec<ValueInput>)>, String> {
+    let mut field = None;
+    let mut values = Vec::with_capacity(branches.len());
+    for branch in branches {
+        let Condition::Compare {
+            field: this,
+            op: Op::Eq,
+            value,
+            ..
+        } = branch
+        else {
+            return Ok(None);
+        };
+        if field.is_some_and(|field: &str| field != this) {
+            return Ok(None);
+        }
+        field = Some(this.as_str());
+        values.push(value);
+    }
+    let Some(field) = field else {
+        return Ok(None);
+    };
+    let values = (values.into_iter())
+        .map(|value| ValueInput::of(value).map_err(|what| format!("an `in` with {what}")))
+        .collect::<Result<Vec<ValueInput>, String>>()?;
+    if values
+        .iter()
+        .any(|value| value.value_type != values[0].value_type)
+    {
+        return Err("an `in` with values of different types".into());
+    }
+    Ok(Some((field, values)))
 }
 
 impl Session {
@@ -158,8 +233,13 @@ impl Session {
         if !(default_sort && !request.sort.descending) {
             filter = request.sorted(filter);
         }
+        filter = request.hinted(filter);
         if let Some(paths) = request.chosen()? {
             filter = filter.select(paths);
+        }
+        let hidden = request.hidden()?;
+        if !hidden.is_empty() {
+            filter = filter.except(hidden);
         }
         let path = self.path().display().to_string();
         let mut command = format!(

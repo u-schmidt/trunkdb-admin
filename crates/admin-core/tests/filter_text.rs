@@ -8,9 +8,9 @@ use common::{Fixture, doc};
 use trunkdb::Document;
 use trunkdb::query::{Condition, Filter};
 use trunkdb_admin_core::{
-    ColumnInput, ConditionInput, ErrorCategory, FilterInput, FilterRows, GroupRequest, Operator,
-    QueryRequest, QueryResult, SaveRequest, SessionManager, SortInput, ValueInput, ValueType,
-    filter_to_rows, filter_to_text,
+    ColumnInput, ConditionInput, ErrorCategory, FilterInput, FilterRows, GroupRequest, KindInput,
+    Operator, QueryRequest, QueryResult, SaveRequest, SessionManager, SortInput, ValueInput,
+    ValueType, filter_to_rows, filter_to_text,
 };
 
 fn request(collection: &str, filter: FilterInput) -> QueryRequest {
@@ -25,6 +25,8 @@ fn request(collection: &str, filter: FilterInput) -> QueryRequest {
         page: 0,
         page_size: 1000,
         select: None,
+        except: Vec::new(),
+        hint: None,
     }
 }
 
@@ -36,6 +38,37 @@ fn row(field: &str, operator: Operator, value: Option<(ValueType, &str)>) -> Con
             value_type,
             text: text.to_string(),
         }),
+        ..Default::default()
+    }
+}
+
+/// An `in` or `not in` row of values of one type.
+fn in_row(
+    field: &str,
+    operator: Operator,
+    value_type: ValueType,
+    texts: &[&str],
+) -> ConditionInput {
+    ConditionInput {
+        field: field.to_string(),
+        operator,
+        values: (texts.iter())
+            .map(|text| ValueInput {
+                value_type,
+                text: text.to_string(),
+            })
+            .collect(),
+        ..Default::default()
+    }
+}
+
+/// An `is` or `is not` row.
+fn kind_row(field: &str, operator: Operator, kind: KindInput) -> ConditionInput {
+    ConditionInput {
+        field: field.to_string(),
+        operator,
+        kind: Some(kind),
+        ..Default::default()
     }
 }
 
@@ -98,6 +131,13 @@ fn rows_and_their_text_find_the_same_and_the_text_turns_back_into_the_rows() {
         vec![row("_id", Eq, Some((Id, &first)))],
         vec![row("note", Exists, None)],
         vec![row("note", Missing, None)],
+        // trunkdb SPEC §158, §159 and §115.
+        vec![row("name", StartsWith, Some((String, "Ann")))],
+        vec![in_row("status", In, String, &["failed", "stuck"])],
+        vec![in_row("status", NotIn, String, &["failed"])],
+        vec![kind_row("f", IsKind, KindInput::Float)],
+        vec![kind_row("n", IsKind, KindInput::Number)],
+        vec![kind_row("at", IsNotKind, KindInput::Date)],
         vec![
             row("name", Contains, Some((String, "anna"))),
             row("ok", Eq, Some((Bool, "false"))),
@@ -134,15 +174,12 @@ fn text_says_what_rows_cant_and_finds_what_trunkdb_finds() {
     let fx = things();
     for (filter, what) in [
         (r#"status = "failed" or n > 3"#, "or"),
-        (r#"status in ("failed", "stuck")"#, "in"),
+        (r#"status in ("failed", 3)"#, "different types"),
         (r#"not (ok = true and n > 0)"#, "not"),
         (r#"items has (sku = "A1" and qty > 2)"#, "has"),
         ("size(tags) = 0", "size"),
         (r#"meta = {"k": 1}"#, "object"),
         (r#"tags = ["a", "b"]"#, "array"),
-        // trunkdb SPEC §158 and §159, from 0.30.0.
-        (r#"status starts with "fa""#, "starts with"),
-        ("n is int", "kind"),
     ] {
         let listed = fx.session.query(&request("things", text(filter))).unwrap();
         let condition: Condition = filter.parse().unwrap();
@@ -236,11 +273,13 @@ fn groups_take_text_and_a_groups_documents_come_back_as_text() {
         request_id: 1,
         collection: "things".into(),
         filter: text(r#"n > 0 or ok = false"#),
+        unwind: Vec::new(),
         group_by: vec!["ok".into()],
         columns: vec![ColumnInput {
             kind: trunkdb_admin_core::ColumnKind::Count,
             field: String::new(),
             condition: String::new(),
+            by: String::new(),
         }],
         sort: None,
         page: 0,
@@ -328,6 +367,68 @@ fn the_command_says_the_list_s_query_quoted_for_a_shell() {
     drop(doc("{}"));
 }
 
+/// An OR of `=`s on one field is an `in`, as trunkdb prints it (its
+/// SPEC §115); on several fields it stays an `or`.
+#[test]
+fn an_or_of_equals_on_one_field_is_an_in_row() {
+    assert_eq!(
+        filter_to_rows(r#"status = "failed" or status = "stuck""#),
+        FilterRows::Rows(vec![in_row(
+            "status",
+            Operator::In,
+            ValueType::String,
+            &["failed", "stuck"]
+        )])
+    );
+    assert_eq!(
+        filter_to_rows(r#"not (n = 1 or n = 2)"#),
+        FilterRows::Rows(vec![in_row(
+            "n",
+            Operator::NotIn,
+            ValueType::Int,
+            &["1", "2"]
+        )])
+    );
+    let FilterRows::Reason(reason) = filter_to_rows(r#"status = "failed" or n = 2"#) else {
+        panic!("two fields are an or");
+    };
+    assert!(reason.contains("`or`"), "{reason}");
+}
+
+#[test]
+fn new_rows_say_what_they_are_missing() {
+    let fx = things();
+    for (rows, problem) in [
+        (
+            vec![in_row("n", Operator::In, ValueType::Int, &[])],
+            "at least one value",
+        ),
+        (
+            vec![in_row("n", Operator::In, ValueType::Int, &["1", "x"])],
+            "value 2:",
+        ),
+        (
+            vec![ConditionInput {
+                field: "n".to_string(),
+                operator: Operator::IsKind,
+                ..Default::default()
+            }],
+            "kind",
+        ),
+        (
+            vec![row("n", Operator::StartsWith, Some((ValueType::Int, "1")))],
+            "starts with",
+        ),
+    ] {
+        let error = fx
+            .session
+            .query(&request("things", FilterInput::Rows(rows)))
+            .expect_err(problem);
+        assert_eq!(error.category, ErrorCategory::InvalidInput);
+        assert!(error.message.contains(problem), "{}", error.message);
+    }
+}
+
 /// A hint (trunkdb SPEC §132) is a clause, like `order by`: the text is
 /// a condition only, so `use index` there is a mistake, never a hint.
 #[test]
@@ -339,4 +440,20 @@ fn a_hint_in_the_text_is_a_mistake() {
         .expect_err("a mistake");
     assert_eq!(error.category, ErrorCategory::InvalidInput);
     assert!(error.at.is_some());
+}
+
+/// The hint goes into the command, as `trunkdb find` reads it (trunkdb
+/// SPEC §132).
+#[test]
+fn the_command_carries_the_hint() {
+    let fx = things();
+    let mut asked = request("things", text("n > 1"));
+    asked.hint = Some(trunkdb_admin_core::HintInput::NoIndex);
+    let command = fx.session.find_command(&asked).unwrap();
+    assert!(command.ends_with("'n > 1 use no index'"), "{command}");
+    asked.hint = Some(trunkdb_admin_core::HintInput::Index {
+        fields: vec!["n".into(), "f".into()],
+    });
+    let command = fx.session.find_command(&asked).unwrap();
+    assert!(command.ends_with("'n > 1 use index (n, f)'"), "{command}");
 }
