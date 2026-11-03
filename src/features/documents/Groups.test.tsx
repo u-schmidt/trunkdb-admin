@@ -172,6 +172,22 @@ describe("groups", () => {
     ]);
   });
 
+  it("hides the list's sort, and says what to do before groups are explained", async () => {
+    const backend = backendWith();
+    const user = await openGroups(backend);
+    expect(screen.queryByLabelText("Sort by")).not.toBeVisible();
+    const explain = screen.getByRole("button", { name: "Explain" });
+    expect(explain).toBeDisabled();
+    expect(explain).toHaveAttribute("title", "Run groups first");
+
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    expect(screen.getByLabelText("Sort by")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await screen.findByText(/read the primary index in sort order/);
+    await user.click(screen.getByRole("button", { name: "Groups" }));
+    expect(await screen.findByText("Run groups to see how they are made.")).toBeInTheDocument();
+  });
+
   it("sorts by a header in the backend: the biggest groups first, then reversed", async () => {
     const backend = backendWith();
     const user = await openGroups(backend);

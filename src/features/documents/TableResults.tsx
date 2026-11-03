@@ -23,12 +23,26 @@ function CellValue({ cell }: { cell: Cell | undefined }) {
       </span>
     );
   }
+  if (cell.kind === "id") {
+    // Its start is the time it was made, alike on a page; its end tells
+    // documents apart. The whole ID is in the tooltip and the document.
+    return (
+      <span className="cell-value kind-id" title={`${KIND_LABELS.id}: ${cell.preview}`}>
+        {shortId(cell.preview)}
+      </span>
+    );
+  }
   const text = cell.kind === "string" ? JSON.stringify(cell.preview) : cell.preview;
   return (
     <span className={`cell-value kind-${cell.kind}`} title={KIND_LABELS[cell.kind]}>
       {text}
     </span>
   );
+}
+
+/** "0192f3a0…0001": an ID's first eight and last four characters. */
+function shortId(id: string): string {
+  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
 }
 
 /**

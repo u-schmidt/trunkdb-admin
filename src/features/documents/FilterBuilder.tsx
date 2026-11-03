@@ -116,6 +116,8 @@ interface Props {
   draftRef?: RefObject<FilterDraft | null>;
   /** The newest query's text that didn't read, shown under the box. */
   mistake?: FilterMistake | null;
+  /** false hides the sort, which the groups don't use: they sort by their own headers. */
+  sortable?: boolean;
 }
 
 type Shape = "value" | "values" | "kind" | "none";
@@ -218,6 +220,7 @@ export function FilterBuilder({
   loaded = null,
   mistake = null,
   draftRef,
+  sortable = true,
 }: Props) {
   const backend = useBackend();
   const fields = useFieldPaths();
@@ -594,7 +597,7 @@ export function FilterBuilder({
         ) : (
           <span />
         )}
-        <span className="filter-sort">
+        <span className="filter-sort" hidden={!sortable}>
           <label htmlFor={sortFieldId}>Sort by</label>
           <input
             id={sortFieldId}

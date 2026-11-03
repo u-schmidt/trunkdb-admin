@@ -41,6 +41,7 @@ export function CollectionView({
             {collection.name}
           </h2>
           {!collection.persisted && <span className="badge badge-warning">Not saved</span>}
+          <ReadingNote />
           <div role="group" aria-label="Collection section" className="segmented">
             <button
               type="button"
@@ -64,7 +65,6 @@ export function CollectionView({
               Fields
             </button>
           </div>
-          <ReadingNote />
           {canMutate && (
             <button type="button" className="danger-quiet" onClick={onDelete}>
               {collection.persisted ? "Delete collection…" : "Remove"}
@@ -101,12 +101,15 @@ export function CollectionView({
   );
 }
 
-/** While every document is read for the field paths. */
+/**
+ * While every document is read for the field paths. Always there, taking
+ * the free room after the name, so the buttons beside it never move.
+ */
 function ReadingNote() {
   const { state } = useFieldPaths();
-  return state.status === "loading" ? (
-    <span className="muted" role="status">
-      Reading field paths…
+  return (
+    <span className="collection-status muted">
+      {state.status === "loading" && <span role="status">Reading field paths…</span>}
     </span>
-  ) : null;
+  );
 }

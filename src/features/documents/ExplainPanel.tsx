@@ -58,7 +58,17 @@ export function ExplainPanel({
         </div>
       )}
       {report === null ? (
-        state.status === "loading" && <p className="muted">Running the query…</p>
+        state.status === "loading" ? (
+          <p className="muted">Running the query…</p>
+        ) : (
+          state.status === "loaded" && (
+            <p className="muted">
+              {grouped
+                ? "Run groups to see how they are made."
+                : "Once the documents are listed, this shows how they were read."}
+            </p>
+          )
+        )
       ) : (
         <div className={state.status === "loading" ? "explain-body explain-stale" : "explain-body"}>
           {report.groups !== null ? (

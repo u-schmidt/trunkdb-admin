@@ -19,6 +19,11 @@ Catching up with what trunkdb 0.30.0 offers.
   documents are those with such an element.
 - **Columns:** hide fields from whole documents instead of choosing the rest.
 - The browser preview's sample data names trunkdb 0.30.0.
+- **Layout:** Explain and Statement take at most a third of the height, and
+  a handle under them gives them more or less; the table shows IDs by their
+  start and end, the whole ID in the tooltip; the Groups view hides the list's
+  sort, and says to run groups before Explain; the collection header no longer
+  moves while field paths are read.
 
 ## 0.1.0 — 2026-11-02
 

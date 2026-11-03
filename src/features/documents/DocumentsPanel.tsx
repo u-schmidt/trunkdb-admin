@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDraftGuard } from "../../app/DraftGuard";
 import { ErrorNotice } from "../../components/ErrorNotice";
+import { PanelResizer } from "../../components/PanelResizer";
 import { useBackend } from "../../ipc/BackendContext";
 import type {
   AppError,
@@ -48,6 +49,9 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
   const [dismissed, setDismissed] = useState<object | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
+  // The most height Explain and Statement may take, once dragged; null: the default cap.
+  const [panelsHeight, setPanelsHeight] = useState<number | null>(null);
+  const panelsRef = useRef<HTMLDivElement>(null);
   const groups = useGroups(sessionId, collection.name);
   const grouped = view === "groups";
 
@@ -280,6 +284,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
           onSort={sortBy}
           loaded={loaded}
           mistake={mistake}
+          sortable={!grouped}
         />
         {!grouped && requested.hint !== null && (
           <p className="hint-note muted" role="note">
@@ -336,6 +341,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             onClick={toggleExplain}
             disabled={subject === null}
             aria-pressed={explainOpen}
+            title={subject === null && grouped ? "Run groups first" : undefined}
           >
             Explain
           </button>
@@ -344,7 +350,11 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             onClick={() => setStatementOpen((open) => !open)}
             disabled={subject === null}
             aria-pressed={statementOpen}
-            title="The query trunkdb is asked for, as its Rust API"
+            title={
+              subject === null && grouped
+                ? "Run groups first"
+                : "The query trunkdb is asked for, as its Rust API"
+            }
           >
             Statement
           </button>
@@ -376,29 +386,48 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             onClose={() => setChoosing(false)}
           />
         )}
-        {explain.state.status !== "closed" && (
-          <ExplainPanel
-            state={explain.state}
-            sortField={applied.sort.field}
-            grouped={grouped}
-            groupFields={groupsAsked?.settings.groupBy ?? []}
-            indexes={collection.indexes}
-            hint={applied.hint}
-            onHint={query.setHint}
-            onClose={closeExplain}
-          />
-        )}
-        {statementOpen && subject !== null && (
-          <StatementPanel
-            grouped={grouped}
-            subject={subject}
-            make={() =>
-              grouped && groupsAsked !== null
-                ? backend.groupsStatement(requestFor(groupsAsked, groups.result?.page ?? 0, 0))
-                : backend.queryStatement(listRequest(0, result?.page ?? 0))
-            }
-            onClose={() => setStatementOpen(false)}
-          />
+        {(explainOpen || (statementOpen && subject !== null)) && (
+          <>
+            <div
+              ref={panelsRef}
+              className="panels"
+              style={
+                panelsHeight === null ? undefined : { maxHeight: `min(${panelsHeight}px, 80%)` }
+              }
+            >
+              {explain.state.status !== "closed" && (
+                <ExplainPanel
+                  state={explain.state}
+                  sortField={applied.sort.field}
+                  grouped={grouped}
+                  groupFields={groupsAsked?.settings.groupBy ?? []}
+                  indexes={collection.indexes}
+                  hint={applied.hint}
+                  onHint={query.setHint}
+                  onClose={closeExplain}
+                />
+              )}
+              {statementOpen && subject !== null && (
+                <StatementPanel
+                  grouped={grouped}
+                  subject={subject}
+                  make={() =>
+                    grouped && groupsAsked !== null
+                      ? backend.groupsStatement(
+                          requestFor(groupsAsked, groups.result?.page ?? 0, 0),
+                        )
+                      : backend.queryStatement(listRequest(0, result?.page ?? 0))
+                  }
+                  onClose={() => setStatementOpen(false)}
+                />
+              )}
+            </div>
+            <PanelResizer
+              label="Explain and Statement"
+              onHeight={setPanelsHeight}
+              measure={() => panelsRef.current?.getBoundingClientRect().height ?? 0}
+            />
+          </>
         )}
         {/* Hidden rather than unmounted: the group settings survive a look
             at the documents. */}

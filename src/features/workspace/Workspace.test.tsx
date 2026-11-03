@@ -323,6 +323,23 @@ describe("results", () => {
     expect(requests(backend)).toHaveLength(1);
   });
 
+  it("shortens an ID to its start and end, the whole one in the tooltip", async () => {
+    const id = "0192f3a0-0000-7000-8000-000000000042";
+    const backend = peopleBackend({
+      collectionQuery: vi.fn(async (_session: string, request: QueryRequest) =>
+        resultFor(request, [objectRow(id)], 1),
+      ),
+    });
+    const user = renderWorkspace(backend);
+    await openCollection(user, "people");
+    await screen.findByRole("list", { name: "Documents as JSON" });
+    await user.click(screen.getByRole("button", { name: "Table" }));
+
+    const table = screen.getByRole("table", { name: "Documents as table" });
+    const cell = within(table).getByText("0192f3a0…0042");
+    expect(cell).toHaveAttribute("title", `Id: ${id}`);
+  });
+
   it("opens a row for editing, by keyboard too", async () => {
     const backend = peopleBackend();
     const user = renderWorkspace(backend);
@@ -725,6 +742,33 @@ describe("filter, sort and paging", () => {
 
     expect(screen.getByText(/page 2 of 3/)).toBeVisible();
     expect(requests(backend)).toHaveLength(2);
+  });
+});
+
+describe("explain and statement panels", () => {
+  it("can be given more or less room with the handle under them", async () => {
+    const backend = peopleBackend();
+    const user = renderWorkspace(backend);
+    await openCollection(user, "people");
+    await screen.findByRole("list", { name: "Documents as JSON" });
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Explain" }));
+    const handle = await screen.findByRole("separator", { name: "Resize Explain and Statement" });
+    const panels = screen.getByRole("region", { name: "How this page is read" })
+      .parentElement as HTMLElement;
+    handle.focus();
+    // jsdom measures every height as 0: a step goes from the minimum.
+    await user.keyboard("{ArrowDown}");
+    expect(panels.style.maxHeight).toBe("min(96px, 80%)");
+    vi.spyOn(panels, "getBoundingClientRect").mockReturnValue({ height: 200 } as DOMRect);
+    await user.keyboard("{ArrowDown}");
+    expect(panels.style.maxHeight).toBe("min(232px, 80%)");
+    await user.keyboard("{ArrowUp}");
+    expect(panels.style.maxHeight).toBe("min(168px, 80%)");
+
+    await user.click(screen.getByRole("button", { name: "Explain" }));
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
   });
 });
 
