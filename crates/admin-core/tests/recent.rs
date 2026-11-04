@@ -30,6 +30,26 @@ fn entries_are_most_recent_first_deduplicated_and_capped() {
     assert_eq!(again.list(), listed);
 }
 
+#[cfg(unix)]
+#[test]
+fn a_file_named_through_a_symlinked_folder_is_listed_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = dir.path().join("real");
+    std::fs::create_dir(&real).unwrap();
+    std::os::unix::fs::symlink(&real, dir.path().join("link")).unwrap();
+    std::fs::write(real.join("db.trunkdb"), b"x").unwrap();
+    let recents = RecentFiles::new(dir.path().join("recent.json"));
+
+    recents
+        .add(&dir.path().join("link/db.trunkdb"), false)
+        .unwrap();
+    let resolved = std::fs::canonicalize(real.join("db.trunkdb")).unwrap();
+    let listed = recents.add(&resolved, false).unwrap();
+
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].path, resolved.display().to_string());
+}
+
 #[test]
 fn a_stale_entry_is_marked_and_removable_and_never_created() {
     let dir = tempfile::tempdir().unwrap();

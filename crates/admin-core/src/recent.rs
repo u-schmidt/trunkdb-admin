@@ -64,16 +64,23 @@ impl RecentFiles {
         self.load().entries()
     }
 
-    /// Puts `path` first, once, remembering how it was opened.
+    /// Puts `path` first, once, remembering how it was opened. An entry
+    /// that names the same file another way (through a symlinked folder,
+    /// like `/var` and `/private/var`) is replaced by it.
     pub fn add(&self, path: &Path, read_only: bool) -> AppResult<Vec<RecentFile>> {
+        let resolved = std::fs::canonicalize(path).ok();
         let path = path.display().to_string();
+        let same_file = |existing: &String| {
+            *existing == path
+                || resolved.is_some() && std::fs::canonicalize(existing).ok() == resolved
+        };
         self.change(|stored| {
-            stored.paths.retain(|existing| *existing != path);
+            stored.paths.retain(|existing| !same_file(existing));
             stored.paths.insert(0, path.clone());
             stored.paths.truncate(Self::MAX_ENTRIES);
             stored.read_only.retain(|existing| *existing != path);
             if read_only {
-                stored.read_only.push(path);
+                stored.read_only.push(path.clone());
             }
         })
     }
