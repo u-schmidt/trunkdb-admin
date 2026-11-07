@@ -41,7 +41,7 @@ export function StoragePanel({ storage, onRefresh, tools }: Props) {
           ? "Another tool is running."
           : undefined;
   return (
-    <section aria-labelledby="storage-heading" className="panel">
+    <section aria-labelledby="storage-heading" className="panel panel-wide">
       <div className="panel-heading">
         <h2 id="storage-heading">Storage</h2>
         <span className="panel-actions">

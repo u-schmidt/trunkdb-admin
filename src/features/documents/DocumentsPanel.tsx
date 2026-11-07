@@ -440,7 +440,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
         )}
         {/* Hidden rather than unmounted: the group settings survive a look
             at the documents. */}
-        <div hidden={!grouped}>
+        <div className="groups-layer" hidden={!grouped}>
           <GroupsView
             groups={groups}
             onShowDocuments={showDocuments}

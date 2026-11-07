@@ -31,7 +31,7 @@ export function DatabaseToolsPanel({
 }) {
   const { check, exporting, importing, busy } = tools;
   return (
-    <section aria-labelledby="tools-heading" className="panel">
+    <section aria-labelledby="tools-heading" className="panel panel-wide">
       <h2 id="tools-heading">Tools</h2>
 
       <div className="tool">

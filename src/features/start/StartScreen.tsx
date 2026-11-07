@@ -1,4 +1,5 @@
 import { FilePlus, FolderOpen, Import, Lock } from "lucide-react";
+import appIcon from "../../../src-tauri/icons/app-icon.svg";
 import { shortenHome } from "../../components/shortenHome";
 import type { AppInfo, RecentFile } from "../../ipc/types";
 
@@ -30,10 +31,15 @@ export function StartScreen({
   onRemoveRecent,
 }: Props) {
   return (
-    <main className="start">
+    <main className="start" data-tauri-drag-region>
       <header className="start-header">
-        <h1>TrunkDB Admin</h1>
-        <p className="muted">Inspect and manage local trunkdb databases.</p>
+        <img src={appIcon} alt="" />
+        <div>
+          <h1>
+            TrunkDB <span className="brand-part">Admin</span>
+          </h1>
+          <p className="muted">Inspect and manage local trunkdb databases.</p>
+        </div>
       </header>
 
       <div className="start-actions">

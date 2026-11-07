@@ -230,7 +230,7 @@ function AppContent() {
 
   if (session === null) {
     return (
-      <div className="app">
+      <div className="app" data-tauri-drag-region>
         {notice}
         <StartScreen
           appInfo={appInfo}
@@ -248,7 +248,7 @@ function AppContent() {
   }
 
   return (
-    <div className="app">
+    <div className="app" data-tauri-drag-region>
       {notice}
       {imported !== null && imported.path === session.path && (
         <div className="notice notice-info" role="status">

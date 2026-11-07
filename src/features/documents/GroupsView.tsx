@@ -380,7 +380,7 @@ function GroupTable({
 }) {
   return (
     <div className="table-scroll">
-      <table className="results-table" aria-label="Groups">
+      <table className="results-table groups-table" aria-label="Groups">
         <thead>
           <tr>
             {result.columns.map((column, at) => {

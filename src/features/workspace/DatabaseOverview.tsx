@@ -55,7 +55,7 @@ export function DatabaseOverview({
     if (compacted !== null) refresh();
   }, [compacted, refresh]);
   return (
-    <div className="overview">
+    <div className="overview" data-tauri-drag-region>
       <section aria-labelledby="file-heading" className="panel">
         <h2 id="file-heading">File</h2>
         <dl className="facts">

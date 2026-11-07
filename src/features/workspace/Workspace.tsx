@@ -142,11 +142,11 @@ export function Workspace({
 
   return (
     <div className="workspace">
-      <div className="shell-side">
-        <div className="shell-brand">
+      <div className="shell-side" data-tauri-drag-region>
+        <div className="shell-brand" data-tauri-drag-region>
           <img src={appIcon} alt="" />
           <span>
-            TrunkDB <span className="shell-brand-part">Admin</span>
+            TrunkDB <span className="brand-part">Admin</span>
           </span>
         </div>
 

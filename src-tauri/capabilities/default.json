@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window may ask of the shell: app commands and native file dialogs. The frontend has no filesystem access of its own.",
+  "description": "What the main window may ask of the shell: app commands, native file dialogs, and moving the window by its empty top areas (the title bar is hidden). The frontend has no filesystem access of its own.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
 }

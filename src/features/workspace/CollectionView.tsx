@@ -37,8 +37,8 @@ export function CollectionView({
       stored={collection.persisted}
     >
       <section className="collection" aria-labelledby="collection-heading">
-        <header className="collection-header">
-          <div className="collection-title">
+        <header className="collection-header" data-tauri-drag-region>
+          <div className="collection-title" data-tauri-drag-region>
             <h2 id="collection-heading" className="collection-name">
               {collection.name}
             </h2>
