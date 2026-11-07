@@ -7,6 +7,12 @@ tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
 Catching up with what trunkdb 0.30.0 offers.
 
+- **New look:** the logo's navy and petrol, and Plus Jakarta Sans, bundled
+  with the app. An open database is laid out as an app window: a navy column
+  with the file, its mode, the collections and Close database; a collection's
+  sections as tabs under its name; the filter in a tinted band; a status bar
+  with the mode, file format and trunkdb release. The database page shows its
+  cards side by side where the window is wide enough.
 - **Filter rows:** `starts with`, `is one of` / `is none of` (trunkdb's `in`
   and `not in`), and `is of kind` / `is not of kind`; text with these turns
   into rows and back.

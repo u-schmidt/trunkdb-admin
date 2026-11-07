@@ -1,4 +1,5 @@
-import { Lock, Pencil, X } from "lucide-react";
+import { Database, Lock, LogOut, Pencil } from "lucide-react";
+import appIcon from "../../../src-tauri/icons/app-icon.svg";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDraftGuard } from "../../app/DraftGuard";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -25,7 +26,10 @@ interface Props {
   onOpenOther: (path: string) => void;
 }
 
-/** The open database: a persistent header naming the file, and its areas. */
+/**
+ * The open database as an app window: a navy column with the file, its
+ * collections and Close; the selected area beside it; a status bar below.
+ */
 export function Workspace({
   session,
   appInfo,
@@ -138,40 +142,39 @@ export function Workspace({
 
   return (
     <div className="workspace">
-      <header className="workspace-header">
-        <div className="workspace-title">
+      <div className="shell-side">
+        <div className="shell-brand">
+          <img src={appIcon} alt="" />
+          <span>
+            TrunkDB <span className="shell-brand-part">Admin</span>
+          </span>
+        </div>
+
+        <header className="workspace-header">
           <h1>
-            {session.file_name}
+            <Database aria-hidden="true" />
+            <span className="workspace-file">{session.file_name}</span>
             {!canMutate && <span className="badge workspace-mode">Read-only</span>}
           </h1>
           <p className="workspace-path" title={session.path}>
             {shortenHome(session.path)}
           </p>
-        </div>
-        {closing && tools.busy && (
-          <span className="muted" role="status">
-            Waiting for the running tool to finish…
-          </span>
-        )}
-        <button type="button" onClick={onSwitchMode} disabled={closing || switching}>
-          {canMutate ? <Lock aria-hidden="true" /> : <Pencil aria-hidden="true" />}
-          {switching ? "Reopening…" : canMutate ? "Reopen read-only" : "Open for editing"}
-        </button>
-        <button type="button" onClick={onClose} disabled={closing || switching}>
-          <X aria-hidden="true" />
-          {closing ? "Closing…" : "Close database"}
-        </button>
-      </header>
-
-      {error !== null && (
-        <ErrorNotice error={error} onDismiss={() => setError(null)}>
-          <button type="button" onClick={refresh}>
-            Try again
+          <button
+            type="button"
+            className="shell-quiet"
+            onClick={onSwitchMode}
+            disabled={closing || switching}
+          >
+            {canMutate ? <Lock aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+            {switching ? "Reopening…" : canMutate ? "Reopen read-only" : "Open for editing"}
           </button>
-        </ErrorNotice>
-      )}
+          {closing && tools.busy && (
+            <span className="workspace-waiting" role="status">
+              Waiting for the running tool to finish…
+            </span>
+          )}
+        </header>
 
-      <div className="workspace-body">
         <Sidebar
           collections={collections}
           selected={onDatabasePage ? null : (current?.name ?? null)}
@@ -180,36 +183,64 @@ export function Workspace({
           onPrepare={prepare}
           onDiscardVirtual={discardVirtual}
         />
-        <main className="workspace-main">
-          {(current === null || onDatabasePage) && (
-            <DatabaseOverview
-              sessionId={sessionId}
-              path={session.path}
-              file={overview?.file ?? session.file}
-              appInfo={appInfo}
-              collections={collections}
-              canMutate={canMutate}
-              onSelect={select}
-              tools={tools}
-              onOpenImported={onOpenOther}
-            />
-          )}
-          {current !== null && (
-            // Keyed: another collection starts with its own filter and page.
-            <div className="workspace-layer" hidden={onDatabasePage}>
-              <CollectionView
-                key={current.name}
-                sessionId={sessionId}
-                collection={current}
-                canMutate={canMutate}
-                onRefreshOverview={refresh}
-                onOverview={show}
-                onDelete={() => requestDelete(current)}
-              />
-            </div>
-          )}
-        </main>
+
+        <div className="shell-foot">
+          <button type="button" onClick={onClose} disabled={closing || switching}>
+            <LogOut aria-hidden="true" />
+            {closing ? "Closing…" : "Close database"}
+          </button>
+        </div>
       </div>
+
+      <main className="workspace-main">
+        {error !== null && (
+          <ErrorNotice error={error} onDismiss={() => setError(null)}>
+            <button type="button" onClick={refresh}>
+              Try again
+            </button>
+          </ErrorNotice>
+        )}
+        {(current === null || onDatabasePage) && (
+          <DatabaseOverview
+            sessionId={sessionId}
+            path={session.path}
+            file={overview?.file ?? session.file}
+            appInfo={appInfo}
+            collections={collections}
+            canMutate={canMutate}
+            onSelect={select}
+            tools={tools}
+            onOpenImported={onOpenOther}
+          />
+        )}
+        {current !== null && (
+          // Keyed: another collection starts with its own filter and page.
+          <div className="workspace-layer" hidden={onDatabasePage}>
+            <CollectionView
+              key={current.name}
+              sessionId={sessionId}
+              collection={current}
+              canMutate={canMutate}
+              onRefreshOverview={refresh}
+              onOverview={show}
+              onDelete={() => requestDelete(current)}
+            />
+          </div>
+        )}
+      </main>
+
+      <footer className="status-bar">
+        <span className={canMutate ? "status-mode" : "status-mode read-only"}>
+          {canMutate ? "Open for editing" : "Read-only"}
+        </span>
+        <span>File format {(overview?.file ?? session.file).format_version}</span>
+        {appInfo !== null && <span>trunkdb {appInfo.trunkdb.version}</span>}
+        {collections !== null && (
+          <span className="status-end">
+            {collections.length === 1 ? "1 collection" : `${collections.length} collections`}
+          </span>
+        )}
+      </footer>
 
       {deleting !== null && (
         <ConfirmDialog

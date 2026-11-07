@@ -71,7 +71,11 @@ databases. What the app does is in `README.md`, how it is built and why in
   current with `setUnsavedDraft`. Code that holds a draft must report it there.
 - Appearance (View → Appearance) is set natively with `AppHandle::set_theme`;
   the styles follow through `prefers-color-scheme`. Colors are tokens in
-  `styles.css` with a light and a dark set; add new colors to both.
+  `styles.css` with a light and a dark set; add new colors to both. They
+  come from the logo: navy `#0F2747` and petrol `#0E8FB8`. Petrol is 3.7:1 on
+  white, so text and filled buttons use the deeper `--accent`, and
+  `--accent-bright` marks, focuses and draws only. The navy column and the
+  status bar (`--shell-*`, `--status-*`) are navy in both appearances.
 - An export writes to a temporary file beside its destination and publishes it
   only when complete and synced (`maintenance.rs`). Keep the database and WAL
   alias checks on both sides of the write.
@@ -106,6 +110,9 @@ databases. What the app does is in `README.md`, how it is built and why in
 - **`lucide-react`** for icons (ISC licence), exact-pinned. An icon stands
   beside a button's text, never instead of it, and is `aria-hidden`; only a
   small inline control like a value's × is icon-only, with an `aria-label`.
+- **`@fontsource-variable/plus-jakarta-sans`** (OFL-1.1), exact-pinned: the
+  trunkdb design system's typeface, bundled so the app never loads a font
+  from the network.
 - **No state-management, form, table or UI component library:** React state
   and one context (the draft guard) are enough, and the result table is plain
   markup because sorting and paging happen in trunkdb.

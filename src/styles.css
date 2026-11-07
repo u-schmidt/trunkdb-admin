@@ -1,47 +1,83 @@
 :root {
   color-scheme: light dark;
-  --bg: #f6f5f2;
+  /* The logo's colors (trunkdb design system). Petrol is 3.7:1 on white, so
+     text and filled buttons use the deeper --accent; --accent-bright is for
+     markers, focus and graphics only. */
+  --navy: #0f2747;
+  --petrol: #0e8fb8;
+
+  --bg: #eef2f7;
   --surface: #ffffff;
-  --border: #d9d6cf;
-  --text: #1f2422;
-  --muted: #5f6763;
-  --accent: #1f6b5e;
+  --surface-2: #f6f8fb;
+  --tint: #eaf4f9;
+  --border: #d8e0ea;
+  --border-strong: #c3cedb;
+  --text: #0f2747;
+  --muted: #56677e;
+  --accent: #0a6e90;
   --accent-text: #ffffff;
-  --danger: #a3261b;
-  --danger-bg: #fbecea;
-  --warning: #7a5200;
+  --accent-bright: #0e8fb8;
+  --accent-soft: #ddeff7;
+  --danger: #b42318;
+  --danger-bg: #fdecea;
+  --warning: #855400;
   --warning-bg: #fff3d6;
-  --focus: #2f7fd1;
-  --json-string: #2f7d32;
-  --json-number: #1d6fb8;
-  --json-literal: #9a4fb0;
+  --focus: #0e8fb8;
+  --json-string: #1b7a4b;
+  --json-number: #0a6e90;
+  --json-literal: #8a3fa8;
   --json-special: #a35b00;
+
+  /* The navy column and the status bar, the same in both appearances. */
+  --shell-bg: #0f2747;
+  --shell-hover: #18355c;
+  --shell-active: #1e426f;
+  --shell-line: #24426a;
+  --shell-text: #d3deec;
+  --shell-muted: #93a7c2;
+  --shell-accent: #7fd3ee;
+  --shell-warning: #ffd27a;
+  --status-bg: #0f2747;
+  --status-text: #c3d1e3;
+
   --radius: 6px;
-  font:
-    14px/1.45 -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  --radius-lg: 10px;
+  --font: "Plus Jakarta Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  font: 13.5px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1e1d;
-    --surface: #242827;
-    --border: #3a403e;
-    --text: #e8ebe9;
-    --muted: #a3aca8;
-    --accent: #4fb3a1;
-    --accent-text: #0e1a17;
-    --danger: #ff9a8f;
-    --danger-bg: #3a201d;
+    --bg: #0b1c33;
+    --surface: #0f2747;
+    --surface-2: #122d52;
+    --tint: #10304f;
+    --border: #213f66;
+    --border-strong: #2d5182;
+    --text: #e8eef6;
+    --muted: #9aacc4;
+    --accent: #2fb0da;
+    --accent-text: #06182e;
+    --accent-bright: #2fb0da;
+    --accent-soft: #143f63;
+    --danger: #ff8a80;
+    --danger-bg: #3d1f2a;
     --warning: #f2c66d;
     --warning-bg: #3a3018;
-    --focus: #7ab8f5;
-    --json-string: #8fd093;
-    --json-number: #7db9ee;
-    --json-literal: #d49be6;
+    --focus: #6fcdf0;
+    --json-string: #8bdca9;
+    --json-number: #6fcdf0;
+    --json-literal: #d7a2ee;
     --json-special: #e8b060;
+
+    --shell-bg: #081629;
+    --shell-hover: #11284a;
+    --shell-active: #173560;
+    --shell-line: #17304f;
+    --status-bg: #081629;
+    --status-text: #9aacc4;
   }
 }
 
@@ -77,15 +113,16 @@ ul {
 }
 
 h1 {
-  font-size: 1.35rem;
-  font-weight: 600;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 h2 {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--muted);
 }
 
@@ -95,11 +132,12 @@ h2 {
 
 button {
   font: inherit;
+  font-weight: 600;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 0.4rem 0.8rem;
+  padding: 0.38rem 0.75rem;
 }
 
 /* An icon sits before the label, centred on the text. */
@@ -123,6 +161,7 @@ button.icon {
 }
 
 button:hover:not(:disabled) {
+  background: var(--surface-2);
   border-color: var(--muted);
 }
 
@@ -134,13 +173,24 @@ button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
-  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  filter: brightness(1.1);
 }
 
 button.quiet {
   background: transparent;
   border-color: transparent;
   color: var(--muted);
+}
+
+button.quiet:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: transparent;
+  color: var(--text);
 }
 
 :focus-visible {
@@ -195,10 +245,12 @@ button.quiet {
 
 .badge {
   flex: none;
-  font-size: 0.8em;
-  padding: 0.1rem 0.45rem;
+  font-size: 0.78em;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
   border-radius: 999px;
-  border: 1px solid currentColor;
+  border: 1px solid transparent;
+  background: var(--accent-soft);
 }
 
 /* The session's mode beside the file name. */
@@ -231,7 +283,7 @@ button.quiet {
   width: 100%;
   max-width: 46rem;
   margin: 0 auto;
-  padding: 3rem 1.5rem 1.5rem;
+  padding: 3.5rem 1.5rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
@@ -252,7 +304,8 @@ button.quiet {
   list-style: none;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .recent-item {
@@ -280,7 +333,7 @@ button.quiet {
 }
 
 .recent-open:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: var(--accent-soft);
 }
 
 .recent-name {
@@ -301,69 +354,207 @@ button.quiet {
   font-size: 0.88em;
 }
 
-/* Workspace */
+/* Workspace: a navy column, the selected area, a status bar below. */
 
 .workspace {
   flex: 1;
   min-height: 0;
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.shell-side {
+  grid-row: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  background: var(--shell-bg);
+  color: var(--shell-text);
+  border-right: 1px solid var(--shell-line);
+}
+
+.shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.9rem 1rem 0.6rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+/* The app icon has its own margin round the rounded square. */
+.shell-brand img {
+  width: 2.1rem;
+  height: 2.1rem;
+  margin: -0.25rem;
+}
+
+.shell-brand-part {
+  font-weight: 500;
+  color: var(--shell-muted);
 }
 
 .workspace-header {
+  margin: 0.25rem 0.75rem 0.5rem;
+  padding: 0.6rem 0.75rem 0.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--shell-hover);
+  border: 1px solid var(--shell-line);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.7rem 1rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-
-.workspace-title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
   min-width: 0;
 }
 
-.workspace-title h1 {
-  font-size: 1.05rem;
+.workspace-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 100%;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #ffffff;
 }
 
-.workspace-path {
-  color: var(--muted);
-  font-size: 0.88em;
+.workspace-header h1 > svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--shell-accent);
+}
+
+.workspace-file {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.workspace-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
+.workspace-mode {
+  font-weight: 600;
+  color: var(--shell-warning);
+  background: rgb(255 196 84 / 15%);
+}
+
+.workspace-path {
+  max-width: 100%;
+  color: var(--shell-muted);
+  font-size: 0.86em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-waiting {
+  color: var(--shell-warning);
+  font-size: 0.86em;
+}
+
+/* Buttons on navy: outlined in the column's own line color. */
+.shell-side button {
+  color: var(--shell-text);
+  background: transparent;
+  border-color: var(--shell-line);
+}
+
+.shell-side button:hover:not(:disabled) {
+  background: var(--shell-hover);
+  border-color: var(--shell-muted);
+  color: #ffffff;
+}
+
+.shell-side button.shell-quiet {
+  margin: 0.25rem 0 0 -0.4rem;
+  padding: 0.15rem 0.4rem;
+  border-color: transparent;
+  color: var(--shell-muted);
+  font-size: 0.86em;
+  font-weight: 500;
+}
+
+.shell-side button.shell-quiet:hover:not(:disabled) {
+  background: var(--shell-active);
+  border-color: transparent;
+}
+
+.shell-side :focus-visible {
+  outline-color: var(--shell-accent);
+}
+
+.shell-foot {
+  padding: 0.7rem 0.75rem 0.85rem;
+  border-top: 1px solid var(--shell-line);
+}
+
+.shell-foot button {
+  width: 100%;
 }
 
 .workspace-main {
-  flex: 1;
+  grid-row: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
+.status-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.3rem 0.9rem;
+  background: var(--status-bg);
+  color: var(--status-text);
+  border-top: 1px solid var(--shell-line);
+  font-size: 0.86em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.status-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.status-mode::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3ecf8e;
+}
+
+.status-mode.read-only::before {
+  background: var(--shell-warning);
+}
+
+.status-end {
+  margin-left: auto;
+}
+
+/* The database page: cards side by side where the window has room. */
 .overview {
   overflow: auto;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
+  padding: 1.25rem 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(30rem, 100%), 1fr));
+  align-items: start;
   gap: 1rem;
 }
 
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  max-width: 46rem;
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.15rem;
+  box-shadow: 0 1px 2px rgb(15 39 71 / 6%);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -391,11 +582,12 @@ button.quiet {
 /* Text fields, selects and buttons share one height: the same line height
    and vertical padding, and a 1px border. */
 input[type="text"],
-select {
+select,
+textarea {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   padding: 0.4rem 0.5rem;
   min-width: 0;
@@ -404,6 +596,12 @@ select {
 input[type="text"]:hover:not(:disabled),
 select:hover:not(:disabled) {
   border-color: var(--muted);
+}
+
+input[type="text"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent-bright);
 }
 
 /* See components/Select.tsx: flat, with our own arrow. */
@@ -446,7 +644,7 @@ code,
 pre,
 .filter-field,
 .filter-value {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
   font-size: 0.92em;
 }
 
@@ -474,52 +672,87 @@ button.link {
 
 .segmented {
   display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
 }
 
 .segmented button {
-  border-radius: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.22rem 0.65rem;
 }
 
-.segmented button + button {
-  border-left: none;
+.segmented button:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
 }
 
-.segmented button:first-child {
-  border-radius: var(--radius) 0 0 var(--radius);
-}
-
-.segmented button:last-child {
-  border-radius: 0 var(--radius) var(--radius) 0;
-}
-
-/* The pressed state is also exposed as aria-pressed and shown in weight. */
+/* The pressed state is also exposed as aria-pressed. */
 .segmented button[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
-  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.segmented button[aria-pressed="true"] > svg {
+  color: var(--accent-bright);
+}
+
+/* A collection's sections: tabs under its name. */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.tabs button {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.5rem 0.75rem 0.6rem;
+  margin-bottom: -1px;
+}
+
+.tabs button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+}
+
+.tabs button[aria-pressed="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent-bright);
+}
+
+.tabs button[aria-pressed="true"] > svg {
+  color: var(--accent-bright);
 }
 
 .state {
   padding: 1.5rem 1rem;
 }
 
-/* Sidebar */
+/* Sidebar: the database's areas, on the navy column. */
 
 .sidebar {
-  flex: none;
-  width: 15rem;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  padding: 0.6rem;
+  padding: 0.25rem 0.5rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 1px;
+}
+
+.sidebar h2 {
+  color: var(--shell-muted);
 }
 
 .sidebar-heading {
-  padding: 0.8rem 0.5rem 0.2rem;
+  padding: 0.9rem 0.5rem 0.3rem;
 }
 
 .sidebar-list {
@@ -534,25 +767,55 @@ button.link {
   align-items: center;
 }
 
-.sidebar-item {
+.shell-side .sidebar-item {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  justify-content: flex-start;
+  gap: 0.55rem;
   text-align: left;
   border-color: transparent;
   background: transparent;
-  padding: 0.35rem 0.5rem;
+  color: var(--shell-text);
+  font-weight: 500;
+  padding: 0.38rem 0.6rem;
 }
 
-.sidebar-item[aria-current="page"] {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  font-weight: 600;
+.shell-side .sidebar-item:hover:not(:disabled) {
+  border-color: transparent;
+}
+
+.sidebar-item > svg {
+  color: var(--shell-muted);
+}
+
+.shell-side .sidebar-item[aria-current="page"] {
+  background: var(--shell-active);
+  color: #ffffff;
+  font-weight: 650;
+}
+
+/* The selected item's marker, in the logo's petrol. */
+.sidebar-item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -0.5rem;
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--petrol);
+}
+
+.sidebar-item[aria-current="page"] > svg {
+  color: var(--shell-accent);
 }
 
 .sidebar-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -560,10 +823,19 @@ button.link {
 
 .sidebar-count {
   flex: none;
-  color: var(--muted);
+  color: var(--shell-muted);
   font-size: 0.88em;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
+}
+
+.sidebar .badge-warning {
+  color: var(--shell-warning);
+  background: rgb(255 196 84 / 15%);
+}
+
+.sidebar .muted {
+  color: var(--shell-muted);
 }
 
 .sidebar-note {
@@ -572,11 +844,19 @@ button.link {
 
 .sidebar-form {
   margin-top: 0.9rem;
-  padding: 0.7rem 0.5rem 0;
-  border-top: 1px solid var(--border);
+  padding: 0.75rem 0.5rem 0;
+  border-top: 1px solid var(--shell-line);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.sidebar-form label {
+  color: var(--shell-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
 }
 
 .sidebar-form-row {
@@ -586,6 +866,21 @@ button.link {
 
 .sidebar-form-row input {
   flex: 1;
+  color: #ffffff;
+  background: var(--shell-hover);
+  border-color: var(--shell-line);
+}
+
+.sidebar-form-row input::placeholder {
+  color: var(--shell-muted);
+}
+
+.sidebar-form-row input:focus {
+  border-color: var(--shell-accent);
+}
+
+.sidebar .field-problem {
+  color: #ffb4ab;
 }
 
 .sidebar-hint {
@@ -618,8 +913,10 @@ button.link {
 .plain-table th,
 .results-table th {
   color: var(--muted);
-  font-weight: 600;
-  font-size: 0.88em;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .numeric {
@@ -630,8 +927,9 @@ button.link {
 .results-table th {
   position: sticky;
   top: 0;
-  background: var(--surface);
+  background: var(--surface-2);
   white-space: nowrap;
+  padding-block: 0.5rem;
 }
 
 /* A header that sorts looks like the others, not like a button. */
@@ -656,17 +954,20 @@ button.link {
   max-width: 22rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
   font-size: 0.9em;
+  padding-block: 0.45rem;
 }
 
-.results-table tbody tr:hover {
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
+.results-table tbody tr:hover,
+.json-block:hover {
+  background: var(--surface-2);
 }
 
 .results-table tbody tr.selected,
 .json-block.selected {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent-bright);
 }
 
 .results-table tbody tr:focus-visible {
@@ -676,7 +977,7 @@ button.link {
 .cell-missing {
   color: var(--muted);
   font-style: italic;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font);
   opacity: 0.75;
 }
 
@@ -718,17 +1019,22 @@ button.link {
 }
 
 .collection-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 1rem;
+  padding: 0.8rem 1.25rem 0;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
+.collection-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .collection-name {
-  font-size: 1.05rem;
+  font-size: 1.35rem;
+  font-weight: 800;
   text-transform: none;
-  letter-spacing: 0;
+  letter-spacing: -0.015em;
   color: var(--text);
   min-width: 0;
   overflow: hidden;
@@ -778,7 +1084,8 @@ button.link {
 }
 
 .filter {
-  padding: 0.7rem 1rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--tint);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -805,8 +1112,12 @@ button.link {
 }
 
 .filter-joiner {
-  width: 3rem;
+  width: 3.5rem;
   color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* "Group by", "Columns": longer words than "Where" and "and". */
@@ -885,7 +1196,7 @@ button.link {
   width: 100%;
   min-height: 4.2rem;
   resize: vertical;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
   font-size: 0.92em;
   line-height: 1.4;
 }
@@ -951,7 +1262,7 @@ button.link {
 }
 
 .filter-syntax-example code {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
 }
 
 .filter-mistake {
@@ -967,14 +1278,18 @@ button.link {
 
 .filter-mistake-line {
   margin: 0.3rem 0 0;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
   font-size: 0.92em;
   white-space: pre;
   overflow-x: auto;
 }
 
+/* Beside an open document the buttons take a second line, never cut off. */
 .results-toolbar {
-  padding: 0.5rem 1rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .results-toolbar .segmented {
@@ -1063,7 +1378,7 @@ button.link {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
   font-size: 0.88em;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -1080,7 +1395,6 @@ button.link {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  border-top: 1px solid var(--border);
   background: var(--surface);
   display: flex;
   flex-direction: column;
@@ -1088,8 +1402,14 @@ button.link {
 
 .pager {
   justify-content: space-between;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1.25rem;
   border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.pager button {
+  padding-block: 0.25rem;
 }
 
 .json-results {
@@ -1098,7 +1418,7 @@ button.link {
 
 .json-block {
   border-bottom: 1px solid var(--border);
-  padding: 0.3rem 1rem 0.6rem;
+  padding: 0.3rem 1.25rem 0.6rem;
 }
 
 .json-block-header {
@@ -1145,6 +1465,7 @@ button.link {
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
+  background: var(--surface-2);
   border-bottom: 1px solid var(--border);
 }
 
@@ -1155,6 +1476,7 @@ button.link {
 .detail-id {
   user-select: text;
   cursor: text;
+  font-size: 0.86em;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
@@ -1177,7 +1499,7 @@ button.link {
 
 .modal {
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 1.5);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   color: var(--text);
   padding: 1.2rem 1.3rem 1rem;
@@ -1186,7 +1508,7 @@ button.link {
 }
 
 .modal::backdrop {
-  background: rgb(0 0 0 / 35%);
+  background: rgb(8 22 41 / 45%);
 }
 
 .modal-title {
@@ -1311,7 +1633,7 @@ button.danger-quiet {
 
 .index-field input {
   flex: 1;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
   font-size: 0.92em;
 }
 
@@ -1366,7 +1688,7 @@ button.danger-quiet {
 }
 
 .tool-ok {
-  border-left-color: var(--accent);
+  border-left-color: var(--accent-bright);
 }
 
 .tool-failed {
@@ -1393,12 +1715,8 @@ button.danger-quiet {
 
 .tool-problems {
   padding-left: 1.4rem;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
   font-size: 0.92em;
-}
-
-.workspace-header > [role="status"] {
-  margin-left: auto;
 }
 
 .workspace-layer {
@@ -1416,6 +1734,6 @@ button.danger-quiet {
 .chosen-note,
 .hint-note {
   margin: 0;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1.25rem;
   border-bottom: 1px solid var(--border);
 }

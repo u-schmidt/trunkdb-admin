@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { LayoutDashboard, Plus, Table2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AppError, CollectionSummary } from "../../ipc/types";
 
@@ -61,7 +61,8 @@ export function Sidebar({
         aria-current={selected === null ? "page" : undefined}
         onClick={() => onSelect(null)}
       >
-        Database
+        <LayoutDashboard aria-hidden="true" />
+        <span className="sidebar-name">Database</span>
       </button>
 
       <h2 className="sidebar-heading">Collections</h2>
@@ -79,6 +80,7 @@ export function Sidebar({
                 aria-current={selected === collection.name ? "page" : undefined}
                 onClick={() => onSelect(collection.name)}
               >
+                <Table2 aria-hidden="true" />
                 <span className="sidebar-name">{collection.name}</span>
                 <Count collection={collection} />
               </button>

@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Braces, KeyRound, List, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { AppError, CollectionSummary, Overview } from "../../ipc/types";
 import { DocumentsPanel } from "../documents/DocumentsPanel";
@@ -38,17 +38,26 @@ export function CollectionView({
     >
       <section className="collection" aria-labelledby="collection-heading">
         <header className="collection-header">
-          <h2 id="collection-heading" className="collection-name">
-            {collection.name}
-          </h2>
-          {!collection.persisted && <span className="badge badge-warning">Not saved</span>}
-          <ReadingNote />
-          <div role="group" aria-label="Collection section" className="segmented">
+          <div className="collection-title">
+            <h2 id="collection-heading" className="collection-name">
+              {collection.name}
+            </h2>
+            {!collection.persisted && <span className="badge badge-warning">Not saved</span>}
+            <ReadingNote />
+            {canMutate && (
+              <button type="button" className="danger-quiet" onClick={onDelete}>
+                <Trash2 aria-hidden="true" />
+                {collection.persisted ? "Delete collection…" : "Remove"}
+              </button>
+            )}
+          </div>
+          <div role="group" aria-label="Collection section" className="tabs">
             <button
               type="button"
               aria-pressed={section === "documents"}
               onClick={() => setSection("documents")}
             >
+              <List aria-hidden="true" />
               Documents
             </button>
             <button
@@ -56,6 +65,7 @@ export function CollectionView({
               aria-pressed={section === "indexes"}
               onClick={() => setSection("indexes")}
             >
+              <KeyRound aria-hidden="true" />
               Indexes
             </button>
             <button
@@ -63,15 +73,10 @@ export function CollectionView({
               aria-pressed={section === "fields"}
               onClick={() => setSection("fields")}
             >
+              <Braces aria-hidden="true" />
               Fields
             </button>
           </div>
-          {canMutate && (
-            <button type="button" className="danger-quiet" onClick={onDelete}>
-              <Trash2 aria-hidden="true" />
-              {collection.persisted ? "Delete collection…" : "Remove"}
-            </button>
-          )}
         </header>
         {/* Hidden rather than unmounted: filter, page and an open document
           draft survive a look at the indexes. */}
