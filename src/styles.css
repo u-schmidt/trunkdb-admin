@@ -595,7 +595,8 @@ button.quiet:hover:not(:disabled) {
   min-height: 0;
 }
 
-.page-header {
+/* No tabs under a page's title: the band closes below it. */
+.collection-header.page-header {
   padding-bottom: 0.9rem;
 }
 
@@ -1096,6 +1097,9 @@ button.link {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  /* Room for a row of buttons whether or not there are any, so the band
+     keeps its height from view to view. */
+  min-height: 2.4rem;
 }
 
 .collection-name {
