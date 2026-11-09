@@ -246,12 +246,12 @@ export function demoBackend(): Backend {
   // As the storage report below has it: a file an older trunkdb made,
   // which this one has written since.
   const file = {
-    format_version: 12,
+    format_version: 16,
     page_size: 8192,
     pages: 214,
     free_pages: 18,
     created_by: "0.24.0",
-    written_by: "0.30.0",
+    written_by: "0.37.0",
   };
   const overview = (): Overview => ({
     file,
@@ -273,7 +273,7 @@ export function demoBackend(): Backend {
   return {
     appInfo: async () => ({
       app_version: "0.1.0",
-      trunkdb: { version: "0.30.0", revision: "7cc7aa6f3cef59117fb485270c936fcce7ae4d98" },
+      trunkdb: { version: "0.37.0", revision: "b3be82bd39fd603bd4665ee206588ab39e3a6ce0" },
     }),
     recentList: async () => recents(),
     recentRemove: async (path) => recents().filter((entry) => entry.path !== path),

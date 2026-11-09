@@ -247,17 +247,35 @@ fn an_existing_destination_is_refused_and_left_as_it_is() {
 
 /// An export of `n` documents in one collection, as JSON Lines: one
 /// exported for the header lines, the rest written without an `_id`,
-/// which an import gives a new one.
+/// which an import gives a new one, before an end line that counts
+/// them all.
 fn big_export(fx: &Fixture, n: usize) -> std::path::PathBuf {
     fx.insert("things", &[r#"{"n": 0}"#]);
     let export = fx.dir.path().join("things.jsonl");
     fx.session.export(&export, false).unwrap();
-    let mut text = std::fs::read_to_string(&export).unwrap();
+    let mut text = without_end(&std::fs::read_to_string(&export).unwrap());
     for i in 1..n {
         text.push_str(&format!("{{\"n\": {i}}}\n"));
     }
-    std::fs::write(&export, text).unwrap();
+    std::fs::write(&export, with_end(text, n)).unwrap();
     export
+}
+
+/// An export's lines without its end line, which counts what it holds
+/// (trunkdb SPEC §165).
+fn without_end(text: &str) -> String {
+    let end = text.trim_end().rfind('\n').unwrap() + 1;
+    assert!(text[end..].starts_with(r#"{"$end""#), "{text}");
+    text[..end].to_string()
+}
+
+/// The lines of one collection's export with an end line counting
+/// `documents`.
+fn with_end(mut text: String, documents: usize) -> String {
+    text.push_str(&format!(
+        "{{\"$end\":{{\"collections\":1,\"documents\":{documents}}}}}\n"
+    ));
+    text
 }
 
 #[test]
@@ -297,7 +315,8 @@ fn an_id_twice_is_the_exports_fault_and_leaves_nothing() {
         .find(|line| line.contains("\"_id\""))
         .unwrap()
         .to_string();
-    std::fs::write(&export, format!("{text}{with_id}\n")).unwrap();
+    let lines = format!("{}{with_id}\n", without_end(&text));
+    std::fs::write(&export, with_end(lines, 11)).unwrap();
     let destination = fx.dir.path().join("new.trunkdb");
     let before = entries(fx.dir.path());
 

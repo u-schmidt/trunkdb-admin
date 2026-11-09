@@ -384,13 +384,7 @@ fn field_paths_are_what_trunkdb_fields_lists() {
                 false => format!("{} (no path can name it)", p.text),
             };
             let kinds: Vec<String> = (p.kinds.iter())
-                .map(|k| {
-                    let name = match format!("{:?}", k.kind).to_lowercase().as_str() {
-                        "datetime" => "date".to_string(),
-                        other => other.to_string(),
-                    };
-                    format!("{name} {}", k.documents)
-                })
+                .map(|k| format!("{} {}", format!("{:?}", k.kind).to_lowercase(), k.documents))
                 .collect();
             words(&format!("{text} {} {}", p.documents, kinds.join(", ")))
         })
