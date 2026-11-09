@@ -12,10 +12,18 @@ interface Props {
   readOnly: boolean;
   /** Leaving goes through the draft guard; the panel only asks. */
   onRequestClose: () => void;
+  /** Another page of the side pane is in front; the draft stays as typed. */
+  hidden?: boolean;
 }
 
 /** The document being edited, beside the list it was opened from. */
-export function DocumentEditor({ collection, editor, readOnly, onRequestClose }: Props) {
+export function DocumentEditor({
+  collection,
+  editor,
+  readOnly,
+  onRequestClose,
+  hidden = false,
+}: Props) {
   const { draft, dirty, saving, error } = editor;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const save = editor.save;
@@ -47,7 +55,7 @@ export function DocumentEditor({ collection, editor, readOnly, onRequestClose }:
           : "Saved";
 
   return (
-    <aside className="detail" aria-label="Document editor">
+    <aside className="side-page" aria-label="Document editor" hidden={hidden}>
       <header className="detail-header">
         <div className="detail-title">
           <h3>{isNew ? "New document" : "Document"}</h3>

@@ -746,29 +746,37 @@ describe("filter, sort and paging", () => {
 });
 
 describe("explain and statement panels", () => {
-  it("can be given more or less room with the handle under them", async () => {
+  it("open beside the list, with tabs when a document is open too", async () => {
     const backend = peopleBackend();
     const user = renderWorkspace(backend);
     await openCollection(user, "people");
     await screen.findByRole("list", { name: "Documents as JSON" });
-    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Table" }));
 
+    // Alone in the pane: no tabs.
     await user.click(screen.getByRole("button", { name: "Explain" }));
-    const handle = await screen.findByRole("separator", { name: "Resize Explain and Statement" });
-    const panels = screen.getByRole("region", { name: "How this page is read" })
-      .parentElement as HTMLElement;
-    handle.focus();
-    // jsdom measures every height as 0: a step goes from the minimum.
-    await user.keyboard("{ArrowDown}");
-    expect(panels.style.maxHeight).toBe("min(96px, 80%)");
-    vi.spyOn(panels, "getBoundingClientRect").mockReturnValue({ height: 200 } as DOMRect);
-    await user.keyboard("{ArrowDown}");
-    expect(panels.style.maxHeight).toBe("min(232px, 80%)");
-    await user.keyboard("{ArrowUp}");
-    expect(panels.style.maxHeight).toBe("min(168px, 80%)");
+    expect(await screen.findByRole("region", { name: "How this page is read" })).toBeVisible();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
 
+    // A document opened comes to the front; Explain waits behind its tab.
+    const [, first] = screen.getAllByRole("row");
+    await user.click(first as HTMLElement);
+    await screen.findByRole("complementary", { name: "Document editor" });
+    const tabs = screen.getByRole("tablist", { name: "Side pane" });
+    expect(within(tabs).getByRole("tab", { name: "Document" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByRole("region", { name: "How this page is read" })).toBeNull();
+
+    await user.click(within(tabs).getByRole("tab", { name: "Explain" }));
+    expect(screen.getByRole("region", { name: "How this page is read" })).toBeVisible();
+    expect(screen.queryByRole("complementary")).toBeNull();
+
+    // Explain again closes it, and the document is in front again.
     await user.click(screen.getByRole("button", { name: "Explain" }));
-    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Document editor" })).toBeVisible();
   });
 });
 

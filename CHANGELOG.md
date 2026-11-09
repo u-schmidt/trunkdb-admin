@@ -13,6 +13,10 @@ Catching up with what trunkdb 0.30.0 offers.
   sections as tabs under its name; the filter in a tinted band; a status bar
   with the mode, file format and trunkdb release. The database page shows its
   cards side by side where the window is wide enough.
+- **Explain and Statement beside the list:** they open in the pane on the
+  right, like a document, with tabs when more than one is open; the list
+  keeps its height. With much open above it, the documents column scrolls on
+  its own and the window stays put.
 - **Filter rows:** `starts with`, `is one of` / `is none of` (trunkdb's `in`
   and `not in`), and `is of kind` / `is not of kind`; text with these turns
   into rows and back.

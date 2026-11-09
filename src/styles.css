@@ -1111,9 +1111,13 @@ button.link {
   display: flex;
 }
 
+/* Crowded (filter, Explain, group settings all open), the column scrolls
+   on its own; the window and its status bar stay put. */
 .documents-list {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -1331,52 +1335,11 @@ button.link {
   margin-right: auto;
 }
 
-/* Explain and Statement: between the toolbar and the list, scrolling on
-   their own so the list stays in view; the handle under them gives them
-   more or less of the height. */
-.panels {
-  flex: none;
-  max-height: 32%;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-resizer {
-  flex: none;
-  height: 7px;
-  cursor: row-resize;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-  touch-action: none;
-}
-
-.panel-resizer::after {
-  content: "";
-  display: block;
-  width: 2.5rem;
-  height: 3px;
-  margin: 1px auto 0;
-  border-radius: 2px;
-  background: var(--border);
-}
-
-.panel-resizer:hover::after,
-.panel-resizer:focus-visible::after {
-  background: var(--accent);
-}
-
-.panel-resizer:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-}
-
 .explain {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border);
   background: var(--surface);
 }
 
@@ -1426,20 +1389,22 @@ button.link {
   opacity: 0.55;
 }
 
+/* The list keeps room for a few rows however much sits above it. */
 .results {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  height: 14rem;
+  min-height: 14rem;
   overflow: auto;
   background: var(--surface);
   display: flex;
   flex-direction: column;
 }
 
-/* The Groups view fills the height like the list, its pager at the bottom. */
+/* The Groups view fills the height like the list, its pager at the bottom;
+   it grows but never shrinks below its settings and a few rows. */
 .groups-layer,
 .groups {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
 }
@@ -1530,6 +1495,58 @@ button.link {
 
 .detail > * {
   direction: ltr;
+}
+
+/* One page of the side pane: a document, Explain or Statement; it scrolls
+   on its own under the tabs. */
+.side-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-page[hidden] {
+  display: none;
+}
+
+/* With more than one page open, tabs choose the one in front. */
+.side-tabs {
+  flex: none;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.4rem 0.75rem 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.side-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem 0.45rem;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.side-tabs button:hover:not(:disabled) {
+  color: var(--text);
+  background: none;
+}
+
+.side-tabs button[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent-bright);
+}
+
+.side-tabs button[aria-selected="true"] svg {
+  color: var(--accent);
 }
 
 .detail-header {

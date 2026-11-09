@@ -1,8 +1,17 @@
-import { Braces, CodeXml, Columns3, Group, Plus, RefreshCw, Route, Table2 } from "lucide-react";
+import {
+  Braces,
+  CodeXml,
+  Columns3,
+  FileJson,
+  Group,
+  Plus,
+  RefreshCw,
+  Route,
+  Table2,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDraftGuard } from "../../app/DraftGuard";
 import { ErrorNotice } from "../../components/ErrorNotice";
-import { PanelResizer } from "../../components/PanelResizer";
 import { useBackend } from "../../ipc/BackendContext";
 import type {
   AppError,
@@ -31,6 +40,8 @@ import { useExplain } from "./useExplain";
 import { useGroups, type GroupSettings } from "./useGroups";
 
 type View = "json" | "table" | "groups";
+/** What the pane beside the list shows: a document, Explain or Statement. */
+type SidePage = "document" | "explain" | "statement";
 
 interface Props {
   sessionId: string;
@@ -50,9 +61,8 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
   const [dismissed, setDismissed] = useState<object | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
-  // The most height Explain and Statement may take, once dragged; null: the default cap.
-  const [panelsHeight, setPanelsHeight] = useState<number | null>(null);
-  const panelsRef = useRef<HTMLDivElement>(null);
+  // The page of the side pane in front, when more than one is open.
+  const [sidePage, setSidePage] = useState<SidePage>("document");
   const groups = useGroups(sessionId, collection.name);
   const grouped = view === "groups";
 
@@ -163,15 +173,6 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
     explained.current = subject;
     explainSubject();
   }, [explainOpen, subject, explainSubject]);
-  const toggleExplain = () => {
-    if (explainOpen) {
-      explained.current = null;
-      explain.close();
-    } else if (subject !== null) {
-      explained.current = subject;
-      explainSubject();
-    }
-  };
   const closeExplain = () => {
     explained.current = null;
     explain.close();
@@ -210,10 +211,51 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
   const select = (index: number) => {
     const row = result?.rows[index];
     if (result === null || row === undefined || row.id === draft?.id) return;
-    guard.requestLeave(() => editor.open(row.id));
+    guard.requestLeave(() => {
+      setSidePage("document");
+      editor.open(row.id);
+    });
   };
 
-  const newDocument = () => guard.requestLeave(() => editor.openNew());
+  const newDocument = () =>
+    guard.requestLeave(() => {
+      setSidePage("document");
+      editor.openNew();
+    });
+
+  // The side pane's pages that are open, in a fixed order; the chosen one
+  // is in front, or the first open one once it closed.
+  const statementShown = statementOpen && subject !== null;
+  const openPages: SidePage[] = [
+    ...(draft !== null || editor.opening ? (["document"] as const) : []),
+    ...(explainOpen ? (["explain"] as const) : []),
+    ...(statementShown ? (["statement"] as const) : []),
+  ];
+  const frontPage: SidePage | null = openPages.includes(sidePage)
+    ? sidePage
+    : (openPages[0] ?? null);
+
+  // Open and in front: closes. Open behind another page: comes to the front.
+  const toggleExplain = () => {
+    if (explainOpen && frontPage !== "explain") {
+      setSidePage("explain");
+    } else if (explainOpen) {
+      explained.current = null;
+      explain.close();
+    } else if (subject !== null) {
+      explained.current = subject;
+      explainSubject();
+      setSidePage("explain");
+    }
+  };
+  const toggleStatement = () => {
+    if (statementOpen && frontPage !== "statement") {
+      setSidePage("statement");
+    } else {
+      setStatementOpen(!statementOpen);
+      setSidePage("statement");
+    }
+  };
 
   let body;
   if (grouped) {
@@ -354,7 +396,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
           </button>
           <button
             type="button"
-            onClick={() => setStatementOpen((open) => !open)}
+            onClick={toggleStatement}
             disabled={subject === null}
             aria-pressed={statementOpen}
             title={
@@ -395,49 +437,6 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             onClose={() => setChoosing(false)}
           />
         )}
-        {(explainOpen || (statementOpen && subject !== null)) && (
-          <>
-            <div
-              ref={panelsRef}
-              className="panels"
-              style={
-                panelsHeight === null ? undefined : { maxHeight: `min(${panelsHeight}px, 80%)` }
-              }
-            >
-              {explain.state.status !== "closed" && (
-                <ExplainPanel
-                  state={explain.state}
-                  sortField={applied.sort.field}
-                  grouped={grouped}
-                  groupFields={groupsAsked?.settings.groupBy ?? []}
-                  indexes={collection.indexes}
-                  hint={applied.hint}
-                  onHint={query.setHint}
-                  onClose={closeExplain}
-                />
-              )}
-              {statementOpen && subject !== null && (
-                <StatementPanel
-                  grouped={grouped}
-                  subject={subject}
-                  make={() =>
-                    grouped && groupsAsked !== null
-                      ? backend.groupsStatement(
-                          requestFor(groupsAsked, groups.result?.page ?? 0, 0),
-                        )
-                      : backend.queryStatement(listRequest(0, result?.page ?? 0))
-                  }
-                  onClose={() => setStatementOpen(false)}
-                />
-              )}
-            </div>
-            <PanelResizer
-              label="Explain and Statement"
-              onHeight={setPanelsHeight}
-              measure={() => panelsRef.current?.getBoundingClientRect().height ?? 0}
-            />
-          </>
-        )}
         {/* Hidden rather than unmounted: the group settings survive a look
             at the documents. */}
         <div className="groups-layer" hidden={!grouped}>
@@ -467,19 +466,84 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
           />
         )}
       </div>
-      {draft !== null ? (
-        <DocumentEditor
-          collection={collection.name}
-          editor={editor}
-          readOnly={!canMutate}
-          onRequestClose={() => guard.requestLeave(editor.close)}
-        />
-      ) : (
-        editor.opening && (
-          <aside className="detail" aria-label="Document editor">
-            <p className="state muted">Loading document…</p>
-          </aside>
-        )
+      {frontPage !== null && (
+        <div className="detail">
+          {openPages.length > 1 && (
+            <div role="tablist" aria-label="Side pane" className="side-tabs">
+              {openPages.map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  role="tab"
+                  aria-selected={page === frontPage}
+                  onClick={() => setSidePage(page)}
+                >
+                  {page === "document" ? (
+                    <FileJson aria-hidden="true" />
+                  ) : page === "explain" ? (
+                    <Route aria-hidden="true" />
+                  ) : (
+                    <CodeXml aria-hidden="true" />
+                  )}
+                  {page === "document"
+                    ? draft?.id === null
+                      ? "New document"
+                      : "Document"
+                    : page === "explain"
+                      ? "Explain"
+                      : "Statement"}
+                </button>
+              ))}
+            </div>
+          )}
+          {draft !== null ? (
+            <DocumentEditor
+              collection={collection.name}
+              editor={editor}
+              readOnly={!canMutate}
+              onRequestClose={() => guard.requestLeave(editor.close)}
+              hidden={frontPage !== "document"}
+            />
+          ) : (
+            editor.opening && (
+              <aside
+                className="side-page"
+                aria-label="Document editor"
+                hidden={frontPage !== "document"}
+              >
+                <p className="state muted">Loading document…</p>
+              </aside>
+            )
+          )}
+          {explain.state.status !== "closed" && (
+            <div className="side-page" hidden={frontPage !== "explain"}>
+              <ExplainPanel
+                state={explain.state}
+                sortField={applied.sort.field}
+                grouped={grouped}
+                groupFields={groupsAsked?.settings.groupBy ?? []}
+                indexes={collection.indexes}
+                hint={applied.hint}
+                onHint={query.setHint}
+                onClose={closeExplain}
+              />
+            </div>
+          )}
+          {statementShown && (
+            <div className="side-page" hidden={frontPage !== "statement"}>
+              <StatementPanel
+                grouped={grouped}
+                subject={subject}
+                make={() =>
+                  grouped && groupsAsked !== null
+                    ? backend.groupsStatement(requestFor(groupsAsked, groups.result?.page ?? 0, 0))
+                    : backend.queryStatement(listRequest(0, result?.page ?? 0))
+                }
+                onClose={() => setStatementOpen(false)}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
