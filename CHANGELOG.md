@@ -5,8 +5,15 @@ tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
 ## Unreleased
 
-Catching up with what trunkdb 0.30.0 offers.
+Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.37.0.
 
+- **trunkdb 0.37.0** instead of 0.30.0: file format 16, which the app's
+  0.1.0 can't open once this version has written to a file. Among what comes
+  with it: a sorted page that isn't full reads each document once, where it
+  read the collection a second time, after a compaction counts what each
+  index leaves out; and a compaction that frees no space still writes those
+  counts. Exports end with a line counting what they hold, which an import
+  checks.
 - **Filter rows:** `starts with`, `is one of` / `is none of` (trunkdb's `in`
   and `not in`), and `is of kind` / `is not of kind`; text with these turns
   into rows and back.
@@ -18,7 +25,7 @@ Catching up with what trunkdb 0.30.0 offers.
   ordered by a field), and unwinding arrays to count their elements; a group's
   documents are those with such an element.
 - **Columns:** hide fields from whole documents instead of choosing the rest.
-- The browser preview's sample data names trunkdb 0.30.0.
+- The browser preview's sample data names trunkdb 0.37.0 and file format 16.
 - **Layout:** Explain and Statement take at most a third of the height, and
   a handle under them gives them more or less; the table shows IDs by their
   start and end, the whole ID in the tooltip; the Groups view hides the list's

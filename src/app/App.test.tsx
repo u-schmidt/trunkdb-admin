@@ -25,7 +25,7 @@ describe("start screen", () => {
     renderApp(backend);
 
     await startHeading();
-    expect(await screen.findByText(/trunkdb 0\.30\.0 \(7cc7aa6\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/trunkdb 0\.37\.0 \(b3be82b\)/)).toBeInTheDocument();
     expect(await screen.findByText("shop.trunkdb")).toBeInTheDocument();
     expect(backend.databaseOpen).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Close database" })).not.toBeInTheDocument();
@@ -46,7 +46,7 @@ describe("start screen", () => {
     expect(fact("Last written by")).toHaveTextContent("trunkdb 0.24.0");
     expect(fact("Created by")).toHaveTextContent("trunkdb 0.24.0");
     expect(within(file).getByText("8,192 bytes")).toBeInTheDocument();
-    expect(within(file).getByText("0.30.0 (7cc7aa6)")).toBeInTheDocument();
+    expect(within(file).getByText("0.37.0 (b3be82b)")).toBeInTheDocument();
   });
 
   it("does nothing when the open dialog is cancelled", async () => {

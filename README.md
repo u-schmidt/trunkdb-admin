@@ -66,10 +66,10 @@ without a database: enough to look at the layout.
 
 ## Bundled trunkdb
 
-trunkdb is built into the app, pinned to the release tag `v0.30.0` in
+trunkdb is built into the app, pinned to the release tag `v0.37.0` in
 `Cargo.toml`; the start screen and the overview show the version and commit.
 The app opens what that trunkdb opens: every file an earlier trunkdb wrote, in
-the current format 12. A file the app writes to is in that format afterwards.
+the current format 16. A file the app writes to is in that format afterwards.
 
 ## Where it keeps things
 

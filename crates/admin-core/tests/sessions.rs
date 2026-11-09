@@ -26,10 +26,10 @@ fn entries(dir: &TempDir) -> Vec<String> {
 
 #[test]
 fn the_bundled_trunkdb_is_the_pinned_one() {
-    assert_eq!(TrunkdbBuild::CURRENT.version, "0.30.0");
+    assert_eq!(TrunkdbBuild::CURRENT.version, "0.37.0");
     assert_eq!(
         TrunkdbBuild::CURRENT.revision,
-        "7cc7aa6f3cef59117fb485270c936fcce7ae4d98"
+        "b3be82bd39fd603bd4665ee206588ab39e3a6ce0"
     );
 }
 
@@ -156,11 +156,11 @@ fn a_file_format_the_bundled_trunkdb_cannot_read_says_which() {
     for (version, words) in [
         (
             9999,
-            "file format 9999, newer than the bundled trunkdb reads (12)",
+            "file format 9999, newer than the bundled trunkdb reads (16)",
         ),
         (
             5,
-            "file format 5; the bundled trunkdb reads formats 6 to 12",
+            "file format 5; the bundled trunkdb reads formats 6 to 16",
         ),
         (0, "before file formats had versions"),
     ] {

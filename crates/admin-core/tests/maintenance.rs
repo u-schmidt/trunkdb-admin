@@ -158,8 +158,8 @@ fn an_export_imports_into_an_identical_database() {
     );
     assert_eq!(
         text.lines().count(),
-        1 + 3 + 9,
-        "one line per header, collection, document"
+        1 + 3 + 9 + 1,
+        "one line per header, collection, document, and the end line"
     );
 
     let copy = Database::open(fx.dir.path().join("copy.trunkdb")).unwrap();
