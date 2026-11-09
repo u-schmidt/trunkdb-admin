@@ -1,13 +1,8 @@
-import { useEffect } from "react";
 import { shortenHome } from "../../components/shortenHome";
 import type { AppInfo, CollectionSummary, FileInfo } from "../../ipc/types";
-import { DatabaseToolsPanel } from "../tools/DatabaseToolsPanel";
-import type { DatabaseTools } from "../tools/useDatabaseTools";
-import { StoragePanel } from "./StoragePanel";
-import { useStorage } from "./useStorage";
+import { DatabasePage } from "./DatabasePage";
 
 interface Props {
-  sessionId: string;
   path: string;
   file: FileInfo;
   appInfo: AppInfo | null;
@@ -16,9 +11,6 @@ interface Props {
   /** false: opened read-only. */
   canMutate: boolean;
   onSelect: (collection: string) => void;
-  tools: DatabaseTools;
-  /** Leaves this database for the one an import made. */
-  onOpenImported: (path: string) => void;
 }
 
 /** A release the file names, or why it names none (trunkdb SPEC §125.3). */
@@ -36,28 +28,11 @@ function indexNames(collection: CollectionSummary): string {
   return ["_id", ...secondary].join(" · ");
 }
 
-export function DatabaseOverview({
-  sessionId,
-  path,
-  file,
-  appInfo,
-  collections,
-  canMutate,
-  onSelect,
-  tools,
-  onOpenImported,
-}: Props) {
-  // Mounted only while the database page is shown: read when it is.
-  const { storage, refresh } = useStorage(sessionId);
-  // A compaction changes every number here: read them again.
-  const compacted = tools.compacting.status === "done" ? tools.compacting.report : null;
-  useEffect(() => {
-    if (compacted !== null) refresh();
-  }, [compacted, refresh]);
+export function DatabaseOverview({ path, file, appInfo, collections, canMutate, onSelect }: Props) {
   return (
-    <div className="overview" data-tauri-drag-region>
+    <DatabasePage id="overview-heading" title="Overview">
       <section aria-labelledby="file-heading" className="panel">
-        <h2 id="file-heading">File</h2>
+        <h3 id="file-heading">File</h3>
         <dl className="facts">
           <dt>Path</dt>
           <dd>{shortenHome(path)}</dd>
@@ -95,7 +70,7 @@ export function DatabaseOverview({
       </section>
 
       <section aria-labelledby="collections-heading" className="panel">
-        <h2 id="collections-heading">Collections</h2>
+        <h3 id="collections-heading">Collections</h3>
         {collections === null ? (
           <p className="muted">Loading…</p>
         ) : collections.length === 0 ? (
@@ -143,10 +118,6 @@ export function DatabaseOverview({
           </table>
         )}
       </section>
-
-      <StoragePanel storage={storage} onRefresh={refresh} tools={canMutate ? tools : undefined} />
-
-      <DatabaseToolsPanel tools={tools} onOpenImported={onOpenImported} />
-    </div>
+    </DatabasePage>
   );
 }

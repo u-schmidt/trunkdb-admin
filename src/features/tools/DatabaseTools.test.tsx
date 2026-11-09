@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DraftGuardProvider } from "../../app/DraftGuard";
 import type { Backend } from "../../ipc/backend";
@@ -33,6 +33,12 @@ function renderWorkspace(backend: Backend, closing = false) {
     </BackendProvider>
   );
   const { rerender } = render(view(closing));
+  // The tools have a page of their own in the side column.
+  fireEvent.click(
+    within(screen.getByRole("navigation", { name: "Database" })).getByRole("button", {
+      name: "Tools",
+    }),
+  );
   return { user: userEvent.setup(), setClosing: (next: boolean) => rerender(view(next)) };
 }
 
@@ -116,7 +122,7 @@ describe("consistency check", () => {
 
     await user.click(await nav.findByRole("button", { name: /^people/ }));
     await screen.findByRole("heading", { name: "people" });
-    await user.click(nav.getByRole("button", { name: "Database" }));
+    await user.click(nav.getByRole("button", { name: "Tools" }));
 
     expect(screen.getByRole("status", { name: "Check report" })).toHaveTextContent(
       "No problems found.",

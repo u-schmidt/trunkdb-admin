@@ -8,10 +8,13 @@ import { shortenHome } from "../../components/shortenHome";
 import { toAppError } from "../../ipc/backend";
 import { useBackend } from "../../ipc/BackendContext";
 import type { AppError, AppInfo, CollectionSummary, Overview, SessionInfo } from "../../ipc/types";
+import { ToolsPage } from "../tools/ToolsPage";
 import { useDatabaseTools } from "../tools/useDatabaseTools";
 import { CollectionView } from "./CollectionView";
 import { DatabaseOverview } from "./DatabaseOverview";
+import type { DatabasePageName } from "./DatabasePage";
 import { Sidebar } from "./Sidebar";
+import { StoragePage } from "./StoragePage";
 
 interface Props {
   session: SessionInfo;
@@ -53,10 +56,11 @@ export function Workspace({
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  // The database page is shown over the selected collection, which stays
+  // A database page is shown over the selected collection, which stays
   // mounted beneath it: a look at the file facts or a run of the tools
   // costs neither the filter and page nor an open document draft.
-  const [onDatabasePage, setOnDatabasePage] = useState(true);
+  // null: the collection is shown.
+  const [page, setPage] = useState<DatabasePageName | null>("overview");
   // Overviews arrive from refreshes and from collection changes; only the
   // answer to the newest request may be shown.
   const newest = useRef(0);
@@ -97,14 +101,13 @@ export function Workspace({
     };
   }, [backend, sessionId]);
 
-  /** Only another collection leaves the draft; the database page does not. */
-  const select = (name: string | null) => {
-    if (name === null) setOnDatabasePage(true);
-    else if (name === selected) setOnDatabasePage(false);
+  /** Only another collection leaves the draft; a database page does not. */
+  const select = (name: string) => {
+    if (name === selected) setPage(null);
     else {
       guard.requestLeave(() => {
         setSelected(name);
-        setOnDatabasePage(false);
+        setPage(null);
       });
     }
   };
@@ -139,6 +142,8 @@ export function Workspace({
 
   const collections = overview?.collections ?? null;
   const current = collections?.find((collection) => collection.name === selected) ?? null;
+  // Without a collection to show, the database's page is.
+  const shownPage: DatabasePageName | null = current === null ? (page ?? "overview") : page;
 
   return (
     <div className="workspace">
@@ -177,8 +182,10 @@ export function Workspace({
 
         <Sidebar
           collections={collections}
-          selected={onDatabasePage ? null : (current?.name ?? null)}
+          page={shownPage}
+          selected={current?.name ?? null}
           canMutate={canMutate}
+          onPage={setPage}
           onSelect={select}
           onPrepare={prepare}
           onDiscardVirtual={discardVirtual}
@@ -200,22 +207,23 @@ export function Workspace({
             </button>
           </ErrorNotice>
         )}
-        {(current === null || onDatabasePage) && (
+        {shownPage === "overview" && (
           <DatabaseOverview
-            sessionId={sessionId}
             path={session.path}
             file={overview?.file ?? session.file}
             appInfo={appInfo}
             collections={collections}
             canMutate={canMutate}
             onSelect={select}
-            tools={tools}
-            onOpenImported={onOpenOther}
           />
         )}
+        {shownPage === "storage" && (
+          <StoragePage sessionId={sessionId} tools={tools} canMutate={canMutate} />
+        )}
+        {shownPage === "tools" && <ToolsPage tools={tools} onOpenImported={onOpenOther} />}
         {current !== null && (
           // Keyed: another collection starts with its own filter and page.
-          <div className="workspace-layer" hidden={onDatabasePage}>
+          <div className="workspace-layer" hidden={shownPage !== null}>
             <CollectionView
               key={current.name}
               sessionId={sessionId}

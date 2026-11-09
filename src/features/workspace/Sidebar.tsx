@@ -1,14 +1,24 @@
-import { LayoutDashboard, Plus, Table2 } from "lucide-react";
+import { HardDrive, LayoutDashboard, Plus, Table2, Wrench } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AppError, CollectionSummary } from "../../ipc/types";
+import type { DatabasePageName } from "./DatabasePage";
+
+const PAGES: { page: DatabasePageName; label: string; icon: typeof Table2 }[] = [
+  { page: "overview", label: "Overview", icon: LayoutDashboard },
+  { page: "storage", label: "Storage", icon: HardDrive },
+  { page: "tools", label: "Tools", icon: Wrench },
+];
 
 interface Props {
   /** null while the first overview is loading. */
   collections: CollectionSummary[] | null;
+  /** The database page shown; null: a collection is. */
+  page: DatabasePageName | null;
   selected: string | null;
   /** false: read-only, so no collection can be added. */
   canMutate: boolean;
-  onSelect: (collection: string | null) => void;
+  onPage: (page: DatabasePageName) => void;
+  onSelect: (collection: string) => void;
   /** Resolves with the reason when the name is refused. */
   onPrepare: (name: string) => Promise<AppError | null>;
   onDiscardVirtual: (name: string) => void;
@@ -28,8 +38,10 @@ function Count({ collection }: { collection: CollectionSummary }) {
 
 export function Sidebar({
   collections,
+  page,
   selected,
   canMutate,
+  onPage,
   onSelect,
   onPrepare,
   onDiscardVirtual,
@@ -55,15 +67,22 @@ export function Sidebar({
 
   return (
     <nav className="sidebar" aria-label="Database">
-      <button
-        type="button"
-        className="sidebar-item"
-        aria-current={selected === null ? "page" : undefined}
-        onClick={() => onSelect(null)}
-      >
-        <LayoutDashboard aria-hidden="true" />
-        <span className="sidebar-name">Database</span>
-      </button>
+      <h2 className="sidebar-heading">Database</h2>
+      <ul className="sidebar-list">
+        {PAGES.map(({ page: name, label, icon: Icon }) => (
+          <li key={name} className="sidebar-row">
+            <button
+              type="button"
+              className="sidebar-item"
+              aria-current={page === name ? "page" : undefined}
+              onClick={() => onPage(name)}
+            >
+              <Icon aria-hidden="true" />
+              <span className="sidebar-name">{label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
 
       <h2 className="sidebar-heading">Collections</h2>
       {collections === null ? (
@@ -77,7 +96,7 @@ export function Sidebar({
               <button
                 type="button"
                 className="sidebar-item"
-                aria-current={selected === collection.name ? "page" : undefined}
+                aria-current={page === null && selected === collection.name ? "page" : undefined}
                 onClick={() => onSelect(collection.name)}
               >
                 <Table2 aria-hidden="true" />

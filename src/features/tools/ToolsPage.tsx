@@ -1,6 +1,7 @@
 import { FileDown, Import, ShieldCheck } from "lucide-react";
 import { shortenHome } from "../../components/shortenHome";
 import type { AppError } from "../../ipc/types";
+import { DatabasePage } from "../workspace/DatabasePage";
 import type { DatabaseTools } from "./useDatabaseTools";
 
 const count = (n: number, one: string, many: string) =>
@@ -19,9 +20,9 @@ function Failure({ title, error }: { title: string; error: AppError }) {
 
 /**
  * Consistency check, whole-database export and import into a new
- * database, each on explicit request.
+ * database, each on explicit request; a card each.
  */
-export function DatabaseToolsPanel({
+export function ToolsPage({
   tools,
   onOpenImported,
 }: {
@@ -31,10 +32,8 @@ export function DatabaseToolsPanel({
 }) {
   const { check, exporting, importing, busy } = tools;
   return (
-    <section aria-labelledby="tools-heading" className="panel panel-wide">
-      <h2 id="tools-heading">Tools</h2>
-
-      <div className="tool">
+    <DatabasePage id="tools-heading" title="Tools">
+      <section className="panel panel-wide tool">
         <div className="tool-head">
           <div>
             <h3>Consistency check</h3>
@@ -87,9 +86,9 @@ export function DatabaseToolsPanel({
             </p>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="tool">
+      <section className="panel panel-wide tool">
         <div className="tool-head">
           <div>
             <h3>Export</h3>
@@ -123,9 +122,9 @@ export function DatabaseToolsPanel({
             <p className="muted">{shortenHome(exporting.summary.path)}</p>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="tool">
+      <section className="panel panel-wide tool">
         <div className="tool-head">
           <div>
             <h3>Import</h3>
@@ -165,7 +164,7 @@ export function DatabaseToolsPanel({
             <p className="muted">{shortenHome(importing.summary.path)}</p>
           </div>
         )}
-      </div>
-    </section>
+      </section>
+    </DatabasePage>
   );
 }

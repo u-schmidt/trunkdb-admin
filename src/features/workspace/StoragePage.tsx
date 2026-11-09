@@ -1,16 +1,17 @@
 import { RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import type { CollectionStorage, StorageReport } from "../../ipc/types";
 import type { DatabaseTools } from "../tools/useDatabaseTools";
 import { formatBytes } from "./bytes";
-import type { StorageState } from "./useStorage";
+import { DatabasePage } from "./DatabasePage";
+import { useStorage } from "./useStorage";
 
 interface Props {
-  storage: StorageState;
-  onRefresh: () => void;
-  /** Compaction; absent in a read-only session. */
-  tools?: DatabaseTools | undefined;
+  sessionId: string;
+  tools: DatabaseTools;
+  /** false: read-only, so no compaction. */
+  canMutate: boolean;
 }
 
 const pagesOf = (report: StorageReport, pages: number) => formatBytes(pages * report.page_size);
@@ -20,7 +21,15 @@ function indexPages(collection: CollectionStorage): number {
 }
 
 /** Where the file's space goes: pages by kind, collections, compaction. */
-export function StoragePanel({ storage, onRefresh, tools }: Props) {
+export function StoragePage({ sessionId, tools: allTools, canMutate }: Props) {
+  const tools = canMutate ? allTools : undefined;
+  // Mounted only while the page is shown: read when it is.
+  const { storage, refresh: onRefresh } = useStorage(sessionId);
+  // A compaction changes every number here: read them again.
+  const compacted = allTools.compacting.status === "done" ? allTools.compacting.report : null;
+  useEffect(() => {
+    if (compacted !== null) onRefresh();
+  }, [compacted, onRefresh]);
   const [confirming, setConfirming] = useState(false);
   const report =
     storage.status === "loaded"
@@ -41,10 +50,11 @@ export function StoragePanel({ storage, onRefresh, tools }: Props) {
           ? "Another tool is running."
           : undefined;
   return (
-    <section aria-labelledby="storage-heading" className="panel panel-wide">
-      <div className="panel-heading">
-        <h2 id="storage-heading">Storage</h2>
-        <span className="panel-actions">
+    <DatabasePage
+      id="storage-heading"
+      title="Storage"
+      actions={
+        <>
           {tools !== undefined && (
             // A disabled button shows no tooltip of its own everywhere.
             <span title={why}>
@@ -62,10 +72,11 @@ export function StoragePanel({ storage, onRefresh, tools }: Props) {
             <RefreshCw aria-hidden="true" />
             {storage.status === "loading" ? "Reading…" : "Refresh"}
           </button>
-        </span>
-      </div>
+        </>
+      }
+    >
       {tools?.compacting.status === "done" && (
-        <p className="tool-result tool-ok" role="status" aria-label="Compaction result">
+        <p className="tool-result tool-ok page-wide" role="status" aria-label="Compaction result">
           {compactedLine(tools.compacting.report)}
         </p>
       )}
@@ -91,22 +102,22 @@ export function StoragePanel({ storage, onRefresh, tools }: Props) {
         </ConfirmDialog>
       )}
       {storage.status === "failed" && (
-        <div className="tool-result tool-failed" role="alert">
+        <div className="tool-result tool-failed page-wide" role="alert">
           <p>
             <strong>The sizes could not be read.</strong> {storage.error.message}
           </p>
           {storage.error.detail !== null && <p className="muted">{storage.error.detail}</p>}
           {storage.error.category === "damaged_data" && (
-            <p>The consistency check below says what is damaged.</p>
+            <p>The consistency check under Tools says what is damaged.</p>
           )}
         </div>
       )}
       {report === null ? (
-        storage.status === "loading" && <p className="muted">Reading the file…</p>
+        storage.status === "loading" && <p className="muted page-wide">Reading the file…</p>
       ) : (
         <StorageReportView report={report} />
       )}
-    </section>
+    </DatabasePage>
   );
 }
 
@@ -116,7 +127,7 @@ function StorageReportView({ report }: { report: StorageReport }) {
   return (
     <>
       {report.recovered !== null && (
-        <p className="tool-result tool-warning" role="status">
+        <p className="tool-result tool-warning page-wide" role="status">
           {report.recovered.in_memory ? (
             <>
               The last session didn&apos;t close cleanly.{" "}
@@ -135,82 +146,88 @@ function StorageReportView({ report }: { report: StorageReport }) {
           )}
         </p>
       )}
-      <dl className="facts">
-        <dt>File size</dt>
-        <dd>
-          {pagesOf(report, report.pages)} ({report.pages.toLocaleString("en")} pages)
-        </dd>
-        <dt>Documents</dt>
-        <dd>
-          {pagesOf(report, use.data)} in data pages
-          {use.overflow > 0 && `, ${pagesOf(report, use.overflow)} in overflow pages`}
-        </dd>
-        <dt>Indexes</dt>
-        <dd>{pagesOf(report, use.index)}</dd>
-        <dt>Free pages</dt>
-        <dd>{pagesOf(report, use.free)}</dd>
-        <dt>Header and catalog</dt>
-        <dd>{pagesOf(report, use.header + use.catalog)}</dd>
-        {use.unaccounted > 0 && (
-          <>
-            <dt>Unaccounted</dt>
-            <dd>
-              {use.unaccounted.toLocaleString("en")} pages belong to nothing. Run the consistency
-              check for details.
-            </dd>
-          </>
-        )}
-        <dt>Write-ahead log</dt>
-        <dd>{report.wal_bytes === null ? "none" : formatBytes(report.wal_bytes)}</dd>
-        <dt>Compacting</dt>
-        <dd>
-          {saved > 0
-            ? `would free ${pagesOf(report, saved)} (${saved.toLocaleString("en")} of ${report.pages.toLocaleString("en")} pages)`
-            : "would not make the file smaller"}
-        </dd>
-      </dl>
+      <section aria-labelledby="space-heading" className="panel panel-wide">
+        <h3 id="space-heading">Space</h3>
+        <dl className="facts">
+          <dt>File size</dt>
+          <dd>
+            {pagesOf(report, report.pages)} ({report.pages.toLocaleString("en")} pages)
+          </dd>
+          <dt>Documents</dt>
+          <dd>
+            {pagesOf(report, use.data)} in data pages
+            {use.overflow > 0 && `, ${pagesOf(report, use.overflow)} in overflow pages`}
+          </dd>
+          <dt>Indexes</dt>
+          <dd>{pagesOf(report, use.index)}</dd>
+          <dt>Free pages</dt>
+          <dd>{pagesOf(report, use.free)}</dd>
+          <dt>Header and catalog</dt>
+          <dd>{pagesOf(report, use.header + use.catalog)}</dd>
+          {use.unaccounted > 0 && (
+            <>
+              <dt>Unaccounted</dt>
+              <dd>
+                {use.unaccounted.toLocaleString("en")} pages belong to nothing. Run the consistency
+                check for details.
+              </dd>
+            </>
+          )}
+          <dt>Write-ahead log</dt>
+          <dd>{report.wal_bytes === null ? "none" : formatBytes(report.wal_bytes)}</dd>
+          <dt>Compacting</dt>
+          <dd>
+            {saved > 0
+              ? `would free ${pagesOf(report, saved)} (${saved.toLocaleString("en")} of ${report.pages.toLocaleString("en")} pages)`
+              : "would not make the file smaller"}
+          </dd>
+        </dl>
+      </section>
       {report.collections.length > 0 && (
-        <table className="plain-table" aria-label="Storage by collection">
-          <thead>
-            <tr>
-              <th scope="col">Collection</th>
-              <th scope="col" className="numeric">
-                Documents
-              </th>
-              <th scope="col" className="numeric">
-                Stored data
-              </th>
-              <th scope="col" className="numeric">
-                Pages
-              </th>
-              <th scope="col" className="numeric">
-                Free in pages
-              </th>
-              <th scope="col" className="numeric">
-                Indexes
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.collections.map((collection) => (
-              <tr key={collection.name}>
-                <td>{collection.name}</td>
-                <td className="numeric">{collection.documents.toLocaleString("en")}</td>
-                <td className="numeric">{formatBytes(collection.document_bytes)}</td>
-                <td className="numeric">
-                  {pagesOf(report, collection.data_pages + collection.overflow_pages)}
-                </td>
-                <td className="numeric">{formatBytes(collection.free_bytes)}</td>
-                <td className="numeric">
-                  {pagesOf(report, indexPages(collection))} ·{" "}
-                  {collection.indexes.length === 1
-                    ? "1 index"
-                    : `${collection.indexes.length} indexes`}
-                </td>
+        <section aria-labelledby="by-collection-heading" className="panel panel-wide">
+          <h3 id="by-collection-heading">By collection</h3>
+          <table className="plain-table" aria-label="Storage by collection">
+            <thead>
+              <tr>
+                <th scope="col">Collection</th>
+                <th scope="col" className="numeric">
+                  Documents
+                </th>
+                <th scope="col" className="numeric">
+                  Stored data
+                </th>
+                <th scope="col" className="numeric">
+                  Pages
+                </th>
+                <th scope="col" className="numeric">
+                  Free in pages
+                </th>
+                <th scope="col" className="numeric">
+                  Indexes
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {report.collections.map((collection) => (
+                <tr key={collection.name}>
+                  <td>{collection.name}</td>
+                  <td className="numeric">{collection.documents.toLocaleString("en")}</td>
+                  <td className="numeric">{formatBytes(collection.document_bytes)}</td>
+                  <td className="numeric">
+                    {pagesOf(report, collection.data_pages + collection.overflow_pages)}
+                  </td>
+                  <td className="numeric">{formatBytes(collection.free_bytes)}</td>
+                  <td className="numeric">
+                    {pagesOf(report, indexPages(collection))} ·{" "}
+                    {collection.indexes.length === 1
+                      ? "1 index"
+                      : `${collection.indexes.length} indexes`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
       )}
     </>
   );

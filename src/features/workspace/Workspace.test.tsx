@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DraftGuardProvider } from "../../app/DraftGuard";
 import type { Backend } from "../../ipc/backend";
@@ -135,6 +135,12 @@ describe("overview", () => {
 describe("storage", () => {
   const storagePanel = async () =>
     (await screen.findByRole("heading", { name: "Storage" })).closest("section") as HTMLElement;
+  /** The workspace on its Storage page, from the side column. */
+  const renderStorage = (backend: Backend) => {
+    const user = renderWorkspace(backend);
+    fireEvent.click(within(sidebar()).getByRole("button", { name: "Storage" }));
+    return user;
+  };
 
   it("shows where the space goes, by kind and by collection, and what compacting frees", async () => {
     const backend = fakeBackend({
@@ -143,7 +149,7 @@ describe("storage", () => {
         storageOf({ pages: 40, compacted_pages: 30, wal_bytes: 2048 }, "people"),
       ),
     });
-    renderWorkspace(backend);
+    renderStorage(backend);
 
     const panel = await storagePanel();
     await within(panel).findByText("320.0 KiB (40 pages)");
@@ -159,7 +165,7 @@ describe("storage", () => {
   });
 
   it("says so when the open recovered after an unclean shutdown, and when compacting gains nothing", async () => {
-    renderWorkspace(
+    renderStorage(
       fakeBackend({
         databaseStorage: vi.fn(async () =>
           storageOf({
@@ -186,7 +192,7 @@ describe("storage", () => {
       .mockResolvedValueOnce(storageOf({ pages: 12 }))
       .mockReturnValueOnce(late.promise)
       .mockResolvedValueOnce(storageOf({ pages: 99, compacted_pages: 99 }));
-    const user = renderWorkspace(fakeBackend({ databaseStorage }));
+    const user = renderStorage(fakeBackend({ databaseStorage }));
     const panel = await storagePanel();
     await within(panel).findByText("96.0 KiB (12 pages)");
 
@@ -200,7 +206,7 @@ describe("storage", () => {
   });
 
   it("reports a report it could not read, and where to look for damage", async () => {
-    renderWorkspace(
+    renderStorage(
       fakeBackend({
         databaseStorage: vi.fn(async () => {
           throw appError("damaged_data", "The database file is damaged or incomplete.");
@@ -211,14 +217,14 @@ describe("storage", () => {
     const panel = await storagePanel();
     const alert = await within(panel).findByRole("alert");
     expect(alert).toHaveTextContent("The sizes could not be read.");
-    expect(alert).toHaveTextContent("The consistency check below says what is damaged.");
+    expect(alert).toHaveTextContent("The consistency check under Tools says what is damaged.");
   });
 
-  it("is read when the database page is shown, not with each overview refresh", async () => {
+  it("is read when its page is shown, not with each overview refresh", async () => {
     const backend = fakeBackend({
       sessionOverview: vi.fn(async () => overviewOf(collection("people", 2))),
     });
-    const user = renderWorkspace(backend);
+    const user = renderStorage(backend);
     await storagePanel();
     await waitFor(() => expect(backend.databaseStorage).toHaveBeenCalledTimes(1));
 
@@ -227,7 +233,7 @@ describe("storage", () => {
     await waitFor(() => expect(backend.sessionOverview).toHaveBeenCalledTimes(2));
     expect(backend.databaseStorage).toHaveBeenCalledTimes(1);
 
-    await user.click(within(sidebar()).getByRole("button", { name: "Database" }));
+    await user.click(within(sidebar()).getByRole("button", { name: "Storage" }));
     await storagePanel();
     await waitFor(() => expect(backend.databaseStorage).toHaveBeenCalledTimes(2));
   });

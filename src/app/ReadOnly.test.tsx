@@ -116,8 +116,9 @@ describe("a read-only workspace", () => {
   it("has no action that writes, and keeps every one that reads", async () => {
     const user = await openReadOnly(shopBackend());
 
-    // The database page: no new collection, but the tools.
+    // No new collection, but the tools.
     expect(within(sidebar()).queryByRole("textbox", { name: "New collection" })).toBeNull();
+    await user.click(within(sidebar()).getByRole("button", { name: "Tools" }));
     expect(screen.getByRole("button", { name: "Run check" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Export database…" })).toBeEnabled();
 
@@ -146,11 +147,12 @@ describe("a read-only workspace", () => {
   });
 
   it("says a recovery after a crash is shown from memory", async () => {
-    await openReadOnly(
+    const user = await openReadOnly(
       shopBackend({
         databaseStorage: vi.fn(async () => storageOf({ recovered: { pages: 3, in_memory: true } })),
       }),
     );
+    await user.click(within(sidebar()).getByRole("button", { name: "Storage" }));
 
     const storage = (await screen.findByRole("heading", { name: "Storage" })).closest(
       "section",

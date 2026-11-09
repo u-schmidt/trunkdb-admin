@@ -451,7 +451,7 @@ describe.each(Object.keys(LEAVES))("leaving a modified draft for %s", (name) => 
 
 describe("opening a database an import made", () => {
   async function importAndOpen(user: UserEvent) {
-    await user.click(await inSidebar("Database"));
+    await user.click(await inSidebar("Tools"));
     await user.click(screen.getByRole("button", { name: "Import into a new database…" }));
     const result = await screen.findByRole("status", { name: "Import result" });
     await user.click(within(result).getByRole("button", { name: "Open it" }));
@@ -486,13 +486,13 @@ describe("opening a database an import made", () => {
   });
 });
 
-describe("the database page", () => {
-  it("is shown without leaving the draft, and the collection comes back as it was", async () => {
+describe("the database pages", () => {
+  it("are shown without leaving the draft, and the collection comes back as it was", async () => {
     currentBackend = shopBackend();
     const user = await openPeople(currentBackend);
     await modify(user);
 
-    await user.click(await inSidebar("Database"));
+    await user.click(await inSidebar("Overview"));
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(await screen.findByRole("heading", { name: "File" })).toBeVisible();
@@ -510,7 +510,7 @@ describe("the database page", () => {
     });
     const user = await openPeople(currentBackend);
     await modify(user);
-    await user.click(await inSidebar("Database"));
+    await user.click(await inSidebar("Tools"));
 
     await user.click(screen.getByRole("button", { name: "Run check" }));
     expect(await screen.findByRole("status", { name: "Check report" })).toHaveTextContent(

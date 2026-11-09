@@ -11,8 +11,9 @@ Catching up with what trunkdb 0.30.0 offers.
   with the app. An open database is laid out as an app window: a navy column
   with the file, its mode, the collections and Close database; a collection's
   sections as tabs under its name; the filter in a tinted band; a status bar
-  with the mode, file format and trunkdb release. The database page shows its
-  cards side by side where the window is wide enough.
+  with the mode, file format and trunkdb release. The database has three
+  pages in that column, Overview, Storage and Tools, each with its cards side
+  by side where the window is wide enough.
 - **Explain and Statement beside the list:** they open in the pane on the
   right, like a document, with tabs when more than one is open; the list
   keeps its height. With much open above it, the documents column scrolls on

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../../app/App";
 import { DraftGuardProvider } from "../../app/DraftGuard";
@@ -20,7 +20,13 @@ vi.mock("../../components/JsonEditor", async () => await import("../../test/Plai
 
 // Compact and import.
 
-function renderWorkspace(backend: Backend, readOnly = false, onOpenOther = vi.fn()) {
+/** Opens the database on its `page`, from the side column. */
+function renderWorkspace(
+  backend: Backend,
+  readOnly = false,
+  onOpenOther = vi.fn(),
+  page: "Storage" | "Tools" = "Storage",
+) {
   render(
     <BackendProvider value={backend}>
       <DraftGuardProvider>
@@ -35,6 +41,11 @@ function renderWorkspace(backend: Backend, readOnly = false, onOpenOther = vi.fn
         />
       </DraftGuardProvider>
     </BackendProvider>,
+  );
+  fireEvent.click(
+    within(screen.getByRole("navigation", { name: "Database" })).getByRole("button", {
+      name: page,
+    }),
   );
   return { user: userEvent.setup(), onOpenOther };
 }
@@ -79,7 +90,6 @@ describe("compact", () => {
 
     expect(backend.databaseCompact).toHaveBeenCalledWith("s1");
     expect(await compactButton()).toHaveTextContent("Compacting…");
-    expect(screen.getByRole("button", { name: "Run check" })).toBeDisabled();
     running.resolve({ pages_before: 214, pages_after: 171, page_size: 8192 });
 
     expect(await screen.findByRole("status", { name: "Compaction result" })).toHaveTextContent(
@@ -190,7 +200,7 @@ describe("import", () => {
       pickExportToImport: vi.fn(async () => "/exports/shop.jsonl"),
       pickImportDestination: vi.fn(async (name: string) => `/data/copy-${name}`),
     });
-    const { user, onOpenOther } = renderWorkspace(backend);
+    const { user, onOpenOther } = renderWorkspace(backend, false, vi.fn(), "Tools");
 
     await user.click(await screen.findByRole("button", { name: "Import into a new database…" }));
 
@@ -209,7 +219,7 @@ describe("import", () => {
         throw appError("already_exists", "A file with this name already exists.");
       }),
     });
-    const { user } = renderWorkspace(backend);
+    const { user } = renderWorkspace(backend, false, vi.fn(), "Tools");
 
     await user.click(await screen.findByRole("button", { name: "Import into a new database…" }));
 
