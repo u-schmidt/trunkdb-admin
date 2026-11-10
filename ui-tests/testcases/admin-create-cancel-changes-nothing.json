@@ -1,0 +1,16 @@
+{
+  "name": "admin-create-cancel-changes-nothing",
+  "steps": [
+    "Click \"Create database…\".",
+    "Click Cancel.",
+    "Assert that the start screen still offers \"Create database…\"."
+  ],
+  "after": [
+    {
+      "unchanged": "${GROUNDWORK_RUN_DIR}/state/recent-files.json"
+    },
+    {
+      "absent": "${GROUNDWORK_RUN_DIR}/Untitled.trunkdb"
+    }
+  ]
+}

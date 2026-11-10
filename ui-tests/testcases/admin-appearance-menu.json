@@ -1,0 +1,8 @@
+{
+  "name": "admin-appearance-menu",
+  "steps": [
+    "@admin-open-sample",
+    "Choose View › Appearance › Dark in the menu bar.",
+    "Assert that View › Appearance › Dark is checked."
+  ]
+}

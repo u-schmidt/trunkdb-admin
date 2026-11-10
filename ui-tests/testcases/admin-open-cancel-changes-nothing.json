@@ -1,0 +1,12 @@
+{
+  "name": "admin-open-cancel-changes-nothing",
+  "steps": [
+    "Click \"Open database…\".",
+    "Click Cancel.",
+    "Assert that the start screen still offers \"Open database…\"."
+  ],
+  "after": [
+    { "unchanged": "${GROUNDWORK_RUN_DIR}/sample.trunkdb" },
+    { "unchanged": "${GROUNDWORK_RUN_DIR}/state/recent-files.json" }
+  ]
+}

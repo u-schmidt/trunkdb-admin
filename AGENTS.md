@@ -17,6 +17,8 @@ databases. What the app does is in `README.md`, how it is built and why in
   interface + DTO types mirroring admin-core); `features/` holds screens;
   `app/` holds top-level state; `test/` holds the fake backend for tests and the
   sample-data backend used when the UI runs in a plain browser.
+- `ui-tests/` — UI tests as sentences, run with GroundworkTH against the
+  `wdio-test` build (`ui-tests/README.md`).
 
 ## Commands
 
@@ -35,6 +37,7 @@ databases. What the app does is in `README.md`, how it is built and why in
 | macOS app | `npm run tauri build` → `target/release/bundle/macos/TrunkDB Admin.app` |
 | UI test build through WebDriver, never shipped | `npm run build:wdio-test` → `target/wdio-test/release/trunkdb-admin` |
 | A UI test run's database and recent files | `scripts/wdio-fixture.sh <empty folder>` → prints `TRUNKDB_ADMIN_STATE_DIR=…` |
+| UI tests (macOS, needs GroundworkTH and a model) | `ui-tests/run.sh [test …] [--suite admin-smoke]` |
 
 ## Rules
 

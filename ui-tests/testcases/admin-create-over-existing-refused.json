@@ -1,0 +1,14 @@
+{
+  "name": "admin-create-over-existing-refused",
+  "steps": [
+    "Click \"Create database…\".",
+    "Press Cmd+Shift+G to go to a folder.",
+    "Type ${GROUNDWORK_RUN_DIR} into the path field.",
+    "Press Return.",
+    "Type sample.trunkdb as the file name.",
+    "Click Save.",
+    "Click Replace.",
+    "Assert that the app says the file already exists or was refused."
+  ],
+  "after": [{ "unchanged": "${GROUNDWORK_RUN_DIR}/sample.trunkdb" }]
+}

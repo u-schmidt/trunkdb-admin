@@ -1,0 +1,13 @@
+{
+  "name": "admin-index-create-drop",
+  "steps": [
+    "@admin-open-people",
+    "Open the Indexes tab of the collection.",
+    "Type score into index field 1.",
+    "Click the Create index button.",
+    "Assert that there is a Drop button for the index on score.",
+    "Click the Drop button for the index on score.",
+    "Click Drop index in the confirmation dialog.",
+    "Assert that there is no Drop button for the index on score any more."
+  ]
+}

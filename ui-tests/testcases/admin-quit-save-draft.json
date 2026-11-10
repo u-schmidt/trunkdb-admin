@@ -1,0 +1,17 @@
+{
+  "name": "admin-quit-save-draft",
+  "steps": [
+    "@admin-open-people",
+    "Click New document.",
+    "Type {\"name\": \"Test Person\"} into the new document's JSON.",
+    "Press ⌘Q.",
+    "Click Save.",
+    "Assert that the app is not running."
+  ],
+  "after": [
+    {
+      "run": "../target/pinned-cli/bin/trunkdb count \"$GROUNDWORK_RUN_DIR/sample.trunkdb\" people 'name = \"Test Person\"'",
+      "outputContains": "1"
+    }
+  ]
+}

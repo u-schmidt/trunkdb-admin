@@ -1,0 +1,15 @@
+{
+  "name": "admin-recent-missing-file",
+  "steps": [
+    "Assert that the recent database gone.trunkdb is marked File not found.",
+    "On the start screen, open the recent database gone.trunkdb.",
+    "Assert that the app says the file cannot be found or opened.",
+    "Click the Remove button for gone.trunkdb in the recent databases.",
+    "Assert that gone.trunkdb is no longer in the recent databases."
+  ],
+  "after": [
+    {
+      "absent": "${GROUNDWORK_RUN_DIR}/gone.trunkdb"
+    }
+  ]
+}

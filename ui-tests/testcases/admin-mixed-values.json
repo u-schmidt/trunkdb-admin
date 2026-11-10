@@ -1,0 +1,17 @@
+{
+  "name": "admin-mixed-values",
+  "steps": [
+    "@admin-open-sample",
+    "Open the mixed collection in the sidebar.",
+    "Assert that 9 documents are listed.",
+    "Assert that a document shows max 9223372036854775807 and min -9223372036854775808.",
+    "Assert that a document shows nan as NaN.",
+    "Assert that a document shows bytes as binary AAEC/w==.",
+    "Assert that a document shows a date 2026-03-01T12:00:00Z.",
+    "Assert that a document shows the nested array [1, [2, 3], {\"deep\": true}].",
+    "Switch the documents view to Table.",
+    "Assert that the table lists 9 documents.",
+    "Open the document whose value is \"just text\" from the table.",
+    "Assert that the document editor shows \"just text\"."
+  ]
+}

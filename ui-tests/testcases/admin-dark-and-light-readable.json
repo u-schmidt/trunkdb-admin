@@ -1,0 +1,10 @@
+{
+  "name": "admin-dark-and-light-readable",
+  "steps": [
+    "@admin-open-people",
+    "Choose View › Appearance › Dark in the menu bar.",
+    "Assert that the window has a dark background and its text is readable.",
+    "Choose View › Appearance › Light in the menu bar.",
+    "Assert that the window has a light background and its text is readable."
+  ]
+}

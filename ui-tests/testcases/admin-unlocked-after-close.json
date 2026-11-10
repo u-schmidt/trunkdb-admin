@@ -1,0 +1,14 @@
+{
+  "name": "admin-unlocked-after-close",
+  "steps": [
+    "@admin-open-sample",
+    "Click Close database.",
+    "Assert that the start screen offers \"Open database…\"."
+  ],
+  "after": [
+    {
+      "run": "../target/pinned-cli/bin/trunkdb info \"$GROUNDWORK_RUN_DIR/sample.trunkdb\"",
+      "outputContains": "people"
+    }
+  ]
+}

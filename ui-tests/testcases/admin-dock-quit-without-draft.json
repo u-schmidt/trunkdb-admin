@@ -1,0 +1,11 @@
+{
+  "name": "admin-dock-quit-without-draft",
+  "steps": [
+    "@admin-open-sample",
+    "Choose Quit in the app's Dock menu.",
+    "Assert that the app is not running."
+  ],
+  "after": [
+    { "run": "../target/pinned-cli/bin/trunkdb info \"$GROUNDWORK_RUN_DIR/sample.trunkdb\"" }
+  ]
+}

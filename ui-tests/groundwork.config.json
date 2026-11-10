@@ -1,0 +1,8 @@
+{
+  "name": "TrunkDB Admin",
+  "app": {
+    "binary": "../target/wdio-test/release/trunkdb-admin",
+    "build": "cd .. && npm run build:wdio-test",
+    "prepare": "./prepare.sh \"$GROUNDWORK_RUN_DIR\""
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "admin-missing-and-null-look-different",
+  "steps": [
+    "@admin-open-people",
+    "Switch the documents view to Table.",
+    "Assert that in the note column, a missing value looks different from a null value."
+  ]
+}

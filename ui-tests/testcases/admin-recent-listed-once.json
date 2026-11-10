@@ -1,0 +1,8 @@
+{
+  "name": "admin-recent-listed-once",
+  "steps": [
+    "@admin-open-sample",
+    "Choose File › Close Database in the menu bar.",
+    "Assert that sample.trunkdb is listed once among the recent databases: exactly one \"Remove … sample.trunkdb from recent databases\" button."
+  ]
+}

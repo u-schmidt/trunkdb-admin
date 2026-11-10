@@ -1,0 +1,14 @@
+{
+  "name": "admin-locked-while-open",
+  "steps": [
+    "@admin-open-sample",
+    "Assert that the collections overview lists people with 137 documents."
+  ],
+  "after": [
+    {
+      "run": "../target/pinned-cli/bin/trunkdb info \"$GROUNDWORK_RUN_DIR/sample.trunkdb\"",
+      "exitCode": 1,
+      "outputContains": "in use"
+    }
+  ]
+}

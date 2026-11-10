@@ -1,0 +1,12 @@
+{
+  "name": "admin-quit-menu-item-asks-with-draft",
+  "steps": [
+    "@admin-open-people",
+    "Click New document.",
+    "Type {\"name\": \"Test Person\"} into the new document's JSON.",
+    "Choose TrunkDB Admin › Quit TrunkDB Admin in the menu bar.",
+    "Assert that the app asks whether to save the changes.",
+    "Click Cancel.",
+    "Assert that the new document's JSON still contains Test Person."
+  ]
+}

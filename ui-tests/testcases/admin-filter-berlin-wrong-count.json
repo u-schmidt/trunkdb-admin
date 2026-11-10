@@ -1,0 +1,12 @@
+{
+  "name": "admin-filter-berlin-wrong-count",
+  "expectedResult": "fail",
+  "steps": [
+    "@admin-open-people",
+    "Add a filter condition.",
+    "Type address.city into the field path of condition 1.",
+    "Type Berlin into the value of condition 1.",
+    "Run the filter.",
+    "Assert that 47 documents are listed."
+  ]
+}

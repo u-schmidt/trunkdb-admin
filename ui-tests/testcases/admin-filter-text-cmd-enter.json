@@ -1,0 +1,10 @@
+{
+  "name": "admin-filter-text-cmd-enter",
+  "steps": [
+    "@admin-open-people",
+    "Switch the filter to Text.",
+    "Type address.city = \"Berlin\" into the filter text.",
+    "Press ⌘↩ in the filter text.",
+    "Assert that 46 documents are listed."
+  ]
+}

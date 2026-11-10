@@ -1,0 +1,11 @@
+{
+  "name": "admin-open-through-panel",
+  "steps": [
+    "Click \"Open database…\".",
+    "Press Cmd+Shift+G to go to a folder.",
+    "Type ${GROUNDWORK_RUN_DIR}/sample.trunkdb into the path field.",
+    "Press Return.",
+    "Click Open.",
+    "Assert that the collections overview lists people with 137 documents."
+  ]
+}

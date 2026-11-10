@@ -1,0 +1,9 @@
+{
+  "name": "admin-dark-claimed-light",
+  "expectedResult": "fail",
+  "steps": [
+    "@admin-open-people",
+    "Choose View › Appearance › Dark in the menu bar.",
+    "Assert that the window has a light background."
+  ]
+}

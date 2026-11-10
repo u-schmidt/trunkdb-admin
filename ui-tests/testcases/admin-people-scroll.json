@@ -1,0 +1,10 @@
+{
+  "name": "admin-people-scroll",
+  "steps": [
+    "@admin-open-people",
+    "Scroll down in the list of documents.",
+    "Scroll up in the list of documents.",
+    "Switch the documents view to Table.",
+    "Scroll down in the table."
+  ]
+}

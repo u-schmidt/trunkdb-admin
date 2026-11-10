@@ -1,0 +1,12 @@
+{
+  "name": "admin-editor-undo-redo",
+  "steps": [
+    "@admin-open-people",
+    "Click New document.",
+    "Type {\"name\": \"Test Person\"} into the new document's JSON.",
+    "Press ⌘Z in the new document's JSON.",
+    "Assert that the new document's JSON is {} again.",
+    "Press ⌘⇧Z in the new document's JSON.",
+    "Assert that the new document's JSON contains Test Person."
+  ]
+}

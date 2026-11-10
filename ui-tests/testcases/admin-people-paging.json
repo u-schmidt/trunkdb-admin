@@ -1,0 +1,17 @@
+{
+  "name": "admin-people-paging",
+  "steps": [
+    "@admin-open-people",
+    "Add a filter condition.",
+    "Type address.city into the field path of condition 1.",
+    "Type Berlin into the value of condition 1.",
+    "Run the filter.",
+    "Type name into the Sort by field.",
+    "Choose 25 documents per page.",
+    "Assert that the pager says 46 documents, page 1 of 2.",
+    "Click Next.",
+    "Assert that the pager says page 2 of 2.",
+    "Click Previous.",
+    "Assert that the pager says page 1 of 2."
+  ]
+}

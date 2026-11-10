@@ -1,0 +1,14 @@
+{
+  "name": "admin-dark-editor-and-dialog",
+  "steps": [
+    "@admin-open-people",
+    "Click New document.",
+    "Type {\"name\": \"Test Person\"} into the new document's JSON.",
+    "Choose View › Appearance › Dark in the menu bar.",
+    "Assert that the document editor has a dark background and its text is readable.",
+    "Click Close database.",
+    "Assert that the app asks whether to save the changes.",
+    "Assert that the dialog and the window's title bar are dark and their text is readable.",
+    "Click Cancel."
+  ]
+}

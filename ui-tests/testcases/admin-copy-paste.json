@@ -1,0 +1,13 @@
+{
+  "name": "admin-copy-paste",
+  "steps": [
+    "@admin-open-people",
+    "Click New document.",
+    "Type {\"name\": \"Copied Person\"} into the new document's JSON.",
+    "Press ⌘A in the new document's JSON.",
+    "Press ⌘C.",
+    "Switch the filter to Text.",
+    "Press ⌘V in the filter text.",
+    "Assert that the filter text contains Copied Person."
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "admin-new-document-cmd-s",
+  "steps": [
+    "@admin-open-people",
+    "Click New document.",
+    "Type {\"name\": \"Test Person\", \"score\": 99.5} into the new document's JSON.",
+    "Press ⌘S.",
+    "Assert that 138 documents are listed."
+  ]
+}

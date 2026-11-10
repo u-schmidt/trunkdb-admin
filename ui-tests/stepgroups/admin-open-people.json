@@ -1,0 +1,4 @@
+{
+  "name": "admin-open-people",
+  "steps": ["@admin-open-sample", "Open the people collection in the sidebar."]
+}

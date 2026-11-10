@@ -1,0 +1,14 @@
+{
+  "name": "admin-note-stored-null",
+  "steps": [
+    "@admin-open-people",
+    "Add a filter condition.",
+    "Type note into the field path of condition 1.",
+    "Choose \"exists\" as the operator of condition 1.",
+    "Add a filter condition.",
+    "Type note into the field path of condition 2.",
+    "Choose Null as the value type of condition 2.",
+    "Run the filter.",
+    "Assert that 35 documents are listed."
+  ]
+}

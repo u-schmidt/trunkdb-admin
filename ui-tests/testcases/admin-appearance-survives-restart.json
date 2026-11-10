@@ -1,0 +1,11 @@
+{
+  "name": "admin-appearance-survives-restart",
+  "steps": [
+    "Choose View › Appearance › Dark in the menu bar.",
+    "Press ⌘Q.",
+    "Assert that the app is not running.",
+    "Start the app again.",
+    "Assert that the menu item View › Appearance › Dark shows \"(checked)\".",
+    "Assert that the window has a dark background."
+  ]
+}

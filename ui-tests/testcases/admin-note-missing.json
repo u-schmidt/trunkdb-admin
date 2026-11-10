@@ -1,0 +1,11 @@
+{
+  "name": "admin-note-missing",
+  "steps": [
+    "@admin-open-people",
+    "Add a filter condition.",
+    "Type note into the field path of condition 1.",
+    "Choose \"is missing\" as the operator of condition 1.",
+    "Run the filter.",
+    "Assert that 102 documents are listed."
+  ]
+}

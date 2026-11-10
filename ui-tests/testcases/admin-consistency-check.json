@@ -1,0 +1,9 @@
+{
+  "name": "admin-consistency-check",
+  "steps": [
+    "@admin-open-sample",
+    "Open the Tools page in the side column.",
+    "Run the consistency check.",
+    "Assert that the check reports no problems."
+  ]
+}

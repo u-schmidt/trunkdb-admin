@@ -1,0 +1,16 @@
+{
+  "name": "admin-smoke",
+  "testCases": [
+    "admin-overview",
+    "admin-filter-berlin",
+    "admin-filter-berlin-wrong-count",
+    "admin-sort-name-descending",
+    "admin-unique-index-refused",
+    "admin-consistency-check",
+    "admin-note-stored-null",
+    "admin-note-missing",
+    "admin-filter-text-cmd-enter",
+    "admin-new-document-cmd-s",
+    "admin-index-create-drop"
+  ]
+}

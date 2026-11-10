@@ -1,0 +1,11 @@
+{
+  "name": "admin-table-header-sort",
+  "steps": [
+    "@admin-open-people",
+    "Switch the documents view to Table.",
+    "Click the name column header.",
+    "Assert that the name column header shows it sorts ascending.",
+    "Click the name column header.",
+    "Assert that the first document in the table is named Émile Zola."
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "admin-appearance-system-setting",
+  "steps": [
+    "@admin-open-sample",
+    "Choose View › Appearance › Dark in the menu bar.",
+    "Choose View › Appearance › Use System Setting in the menu bar."
+  ]
+}

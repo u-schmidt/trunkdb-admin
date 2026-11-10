@@ -1,0 +1,10 @@
+{
+  "name": "admin-sort-name-descending",
+  "steps": [
+    "@admin-open-people",
+    "Switch the result view to Table.",
+    "Type name into the Sort by field.",
+    "Choose descending as the sort direction.",
+    "Assert that the first document in the table is named Émile Zola."
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "admin-unique-index-refused",
+  "steps": [
+    "@admin-open-people",
+    "Open the Indexes tab of the collection.",
+    "Type score into index field 1.",
+    "Tick the Unique checkbox.",
+    "Click the Create index button.",
+    "Assert that an error says a unique index does not allow this value twice."
+  ]
+}

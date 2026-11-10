@@ -1,0 +1,21 @@
+{
+  "name": "admin-export-onto-database-not-offered",
+  "steps": [
+    "@admin-open-sample",
+    "Click Export database….",
+    "Press Cmd+Shift+G to go to a folder.",
+    "Type ${GROUNDWORK_RUN_DIR} into the path field.",
+    "Press Return.",
+    "Type sample.trunkdb as the file name.",
+    "Click Save.",
+    "Assert that the export is complete and was written to sample.trunkdb.jsonl, not to the database file."
+  ],
+  "after": [
+    {
+      "unchanged": "${GROUNDWORK_RUN_DIR}/sample.trunkdb"
+    },
+    {
+      "exists": "${GROUNDWORK_RUN_DIR}/sample.trunkdb.jsonl"
+    }
+  ]
+}

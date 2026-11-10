@@ -1,0 +1,8 @@
+{
+  "name": "admin-editor-highlighting",
+  "steps": [
+    "@admin-open-people",
+    "Open the first document in the list.",
+    "Assert that the document's JSON is syntax-highlighted: keys and values in different colours."
+  ]
+}

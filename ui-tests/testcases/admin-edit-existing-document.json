@@ -1,0 +1,20 @@
+{
+  "name": "admin-edit-existing-document",
+  "steps": [
+    "@admin-open-people",
+    "Open the first document in the list.",
+    "Press ⌘A in the document's JSON.",
+    "Type {\"name\": \"Edited Person\", \"score\": 1.5} into the document's JSON.",
+    "Press ⌘S.",
+    "Assert that the document is saved.",
+    "Assert that the list of documents shows Edited Person.",
+    "Click Close database.",
+    "Assert that the start screen offers \"Open database…\"."
+  ],
+  "after": [
+    {
+      "run": "../target/pinned-cli/bin/trunkdb count \"$GROUNDWORK_RUN_DIR/sample.trunkdb\" people 'name = \"Edited Person\"'",
+      "outputContains": "1"
+    }
+  ]
+}
