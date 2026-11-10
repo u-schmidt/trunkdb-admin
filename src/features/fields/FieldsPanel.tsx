@@ -84,7 +84,6 @@ export function FieldsPanel() {
                     {path.nameable && (
                       <button
                         type="button"
-                        className="quiet"
                         aria-label={`Copy ${path.text}`}
                         onClick={() => copy(path)}
                       >

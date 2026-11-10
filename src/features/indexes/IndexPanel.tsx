@@ -250,8 +250,9 @@ export function IndexPanel({ sessionId, collection, canMutate, onOverview }: Pro
           onClose={() => setDropping(null)}
         >
           <p>
-            The index on <code>{indexName(dropping.fields)}</code> ({options(dropping)}) of “
-            {collection.name}” will be removed. The documents stay.
+            The index on <code>{indexName(dropping.fields)}</code>
+            {options(dropping) !== "none" && ` (${options(dropping)})`} of “{collection.name}” will
+            be removed. The documents stay.
           </p>
         </ConfirmDialog>
       )}

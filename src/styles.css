@@ -979,6 +979,12 @@ button.link {
   vertical-align: top;
 }
 
+/* Short rows: centred, and a button in one doesn't make it taller. */
+.plain-table th,
+.plain-table td {
+  vertical-align: middle;
+}
+
 .plain-table th,
 .results-table th {
   color: var(--muted);
@@ -1468,6 +1474,7 @@ button.link {
   width: 100%;
 }
 
+.plain-table td button,
 .results-table td button {
   font-family: var(--font);
   font-size: 0.95em;

@@ -192,7 +192,6 @@ function AlternativesTable({
                   ) : (
                     <button
                       type="button"
-                      className="quiet"
                       aria-label={`Read the page by ${alternativeWords(alternative)}`}
                       onClick={() => alternative.hint !== null && onHint(alternative.hint)}
                     >
