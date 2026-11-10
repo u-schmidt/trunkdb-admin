@@ -22,7 +22,7 @@ app as a whole, its native panels, menus, quitting and restarting.
 
 ## Running
 
-GroundworkTH checked out beside this repository, as `groundwork-th-public`
+GroundworkTH checked out beside this repository, as `groundwork-th`
 (or `GROUNDWORK_TH` pointing to it), with `npm install` done there and a
 model chosen once with `groundwork init`; macOS, since the app's test build
 and the helper below are macOS only.
@@ -38,8 +38,8 @@ front and types into it, and the copy/paste test writes the clipboard.
 
 ```bash
 cd ui-tests
-../../groundwork-th-public/bin/groundwork.mjs dashboard   # opens this project
-../../groundwork-th-public/bin/groundwork.mjs build       # the admin's test build
+../../groundwork-th/bin/groundwork.mjs dashboard   # opens this project
+../../groundwork-th/bin/groundwork.mjs build       # the admin's test build
 ./run.sh                                           # all tests, as one run
 ./run.sh admin-overview                            # just these
 ./run.sh --suite admin-smoke
