@@ -14,7 +14,6 @@ interface Props {
   hint: HintInput | null;
   /** Reads the list's page with another hint, or none. */
   onHint: (hint: HintInput | null) => void;
-  onClose: () => void;
 }
 
 const count = (n: number) => n.toLocaleString("en");
@@ -28,7 +27,6 @@ export function ExplainPanel({
   indexes,
   hint,
   onHint,
-  onClose,
 }: Props) {
   const answer =
     state.status === "loaded" ? state.report : state.status === "loading" ? state.previous : null;
@@ -45,9 +43,6 @@ export function ExplainPanel({
           {grouped ? "How these groups are made" : "How this page is read"}
         </h2>
         {state.status === "loading" && <span className="muted">Reading…</span>}
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
       </div>
       {state.status === "failed" && (
         <div className="tool-result tool-failed" role="alert">

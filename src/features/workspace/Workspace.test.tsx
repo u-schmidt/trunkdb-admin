@@ -23,6 +23,7 @@ import {
   storageOf,
 } from "../../test/fakeBackend";
 import { Workspace } from "./Workspace";
+import { showSidePage } from "../../test/sidePane";
 
 vi.mock("../../components/JsonEditor", async () => await import("../../test/PlainJsonEditor"));
 
@@ -752,23 +753,28 @@ describe("filter, sort and paging", () => {
 });
 
 describe("explain and statement panels", () => {
-  it("open beside the list, with tabs when a document is open too", async () => {
+  it("open beside the list in tabs, next to the document's", async () => {
     const backend = peopleBackend();
     const user = renderWorkspace(backend);
     await openCollection(user, "people");
     await screen.findByRole("list", { name: "Documents as JSON" });
     await user.click(screen.getByRole("button", { name: "Table" }));
 
-    // Alone in the pane: no tabs.
-    await user.click(screen.getByRole("button", { name: "Explain" }));
-    expect(await screen.findByRole("region", { name: "How this page is read" })).toBeVisible();
+    // Hidden at first; shown, the pane always has its three tabs.
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    await showSidePage(user, "Explain");
+    expect(await screen.findByRole("region", { name: "How this page is read" })).toBeVisible();
+    const tabs = screen.getByRole("tablist", { name: "Side pane" });
+    expect(
+      within(tabs)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Document", "Explain", "Statement"]);
 
-    // A document opened comes to the front; Explain waits behind its tab.
+    // A document opened comes to the front; Explain rests behind its tab.
     const [, first] = screen.getAllByRole("row");
     await user.click(first as HTMLElement);
     await screen.findByRole("complementary", { name: "Document editor" });
-    const tabs = screen.getByRole("tablist", { name: "Side pane" });
     expect(within(tabs).getByRole("tab", { name: "Document" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -776,13 +782,34 @@ describe("explain and statement panels", () => {
     expect(screen.queryByRole("region", { name: "How this page is read" })).toBeNull();
 
     await user.click(within(tabs).getByRole("tab", { name: "Explain" }));
-    expect(screen.getByRole("region", { name: "How this page is read" })).toBeVisible();
+    expect(await screen.findByRole("region", { name: "How this page is read" })).toBeVisible();
     expect(screen.queryByRole("complementary")).toBeNull();
 
-    // Explain again closes it, and the document is in front again.
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    // Hidden and shown again, the pane still has the document.
+    await user.click(screen.getByRole("button", { name: "Hide side pane" }));
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Side pane" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    await showSidePage(user, "Document");
     expect(screen.getByRole("complementary", { name: "Document editor" })).toBeVisible();
+  });
+
+  it("are resized by the pane's edge, and the width is kept", async () => {
+    const backend = peopleBackend();
+    const user = renderWorkspace(backend);
+    await openCollection(user, "people");
+    await showSidePage(user, "Document");
+    const edge = screen.getByRole("separator", { name: "Resize side pane" });
+    edge.focus();
+    await user.keyboard("{ArrowLeft}");
+    // jsdom measures nothing: the narrowest width, made one step wider.
+    expect(edge.parentElement).toHaveStyle({ width: "320px" });
+    expect(JSON.parse(localStorage.getItem("trunkdb-admin.side-pane") ?? "{}")).toEqual({
+      open: true,
+      width: 320,
+    });
   });
 });
 
@@ -803,7 +830,7 @@ describe("explain", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await screen.findByText(/page 2 of 3/);
 
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await showSidePage(user, "Explain");
 
     await within(panel()).findByText(/read the primary index in sort order and stopped/);
     expect(explainRequests(backend)).toEqual([
@@ -857,7 +884,7 @@ describe("explain", () => {
       ),
     });
     const user = await openPeople(backend);
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await showSidePage(user, "Explain");
     const others = await within(panel()).findByRole("table", {
       name: "Other ways to read this page",
     });
@@ -909,7 +936,7 @@ describe("explain", () => {
     await user.type(screen.getByLabelText("Sort by"), "name{Enter}");
     await waitFor(() => expect(lastRequest(backend).sort.field).toBe("name"));
 
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await showSidePage(user, "Explain");
     await within(panel()).findByText(/An index on “name” could let trunkdb stop/);
 
     // A new list result is explained again without asking.
@@ -958,7 +985,7 @@ describe("explain", () => {
     });
     const user = await openPeople(backend);
 
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await showSidePage(user, "Explain");
     await within(panel()).findByText(
       "trunkdb used the index on age and looked only at the range below.",
     );
@@ -983,7 +1010,7 @@ describe("explain", () => {
     const backend = peopleBackend();
     const user = await openPeople(backend);
     const next = () => user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await showSidePage(user, "Explain");
     await within(panel()).findByText(/read the primary index in sort order/);
     expect(explainRequests(backend).map((request) => request.page)).toEqual([0]);
 
@@ -1000,7 +1027,7 @@ describe("explain", () => {
     // One explanation per list result, however often the panel renders.
     expect(explainRequests(backend)).toHaveLength(3);
 
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await user.click(screen.getByRole("button", { name: "Hide side pane" }));
     expect(screen.queryByRole("region", { name: "How this page is read" })).not.toBeInTheDocument();
     await next();
     await screen.findByText(/page 2 of 3/);
@@ -1016,7 +1043,7 @@ describe("explain", () => {
     const backend = peopleBackend({ collectionExplain: explain });
     const user = await openPeople(backend);
 
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await showSidePage(user, "Explain");
     expect(await within(panel()).findByRole("alert")).toHaveTextContent(
       "The query could not be explained. A page is damaged.",
     );
@@ -1024,12 +1051,12 @@ describe("explain", () => {
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(panel()).toHaveAttribute("aria-busy", "true"));
     expect(panel()).toHaveTextContent("Reading…");
-    await user.click(within(panel()).getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "Hide side pane" }));
     late.resolve(explainOf(lastRequest(backend), { request_id: 2 }));
     await late.promise;
 
     expect(screen.queryByRole("region", { name: "How this page is read" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Explain" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Side pane" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );

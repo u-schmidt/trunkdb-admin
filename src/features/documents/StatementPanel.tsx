@@ -9,7 +9,6 @@ interface Props {
   subject: object;
   /** The statement, written by the backend from what was run. */
   make: () => Promise<string>;
-  onClose: () => void;
 }
 
 type State =
@@ -22,7 +21,7 @@ type State =
  * calls that make it: the list's count and page, or the groups'
  * aggregate. Written again for every new page or groups while open.
  */
-export function StatementPanel({ grouped, subject, make, onClose }: Props) {
+export function StatementPanel({ grouped, subject, make }: Props) {
   const [state, setState] = useState<State>({ status: "loading", subject });
   const [copied, setCopied] = useState<boolean | null>(null);
 
@@ -76,9 +75,6 @@ export function StatementPanel({ grouped, subject, make, onClose }: Props) {
         )}
         <button type="button" onClick={() => void copy()} disabled={text === null}>
           Copy
-        </button>
-        <button type="button" onClick={onClose}>
-          Close
         </button>
       </div>
       <p className="muted">

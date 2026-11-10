@@ -126,7 +126,7 @@ describe("a read-only workspace", () => {
     await screen.findByRole("list", { name: "Documents as JSON" });
     expect(screen.queryByRole("button", { name: "New document" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete collection…" })).toBeNull();
-    for (const name of ["Table", "Groups", "Explain", "Refresh"]) {
+    for (const name of ["Table", "Groups", "Side pane", "Refresh"]) {
       expect(screen.getByRole("button", { name })).toBeVisible();
     }
 
@@ -137,7 +137,8 @@ describe("a read-only workspace", () => {
     for (const name of ["Save", "Format", "Delete…"]) {
       expect(within(panel).queryByRole("button", { name })).toBeNull();
     }
-    await user.click(within(panel).getByRole("button", { name: "Close" }));
+    expect(within(panel).queryByRole("button", { name: "Close" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Hide side pane" }));
     await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
 
     await user.click(screen.getByRole("button", { name: "Indexes" }));

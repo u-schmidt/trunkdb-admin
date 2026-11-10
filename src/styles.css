@@ -770,6 +770,16 @@ button.link {
   color: var(--accent-bright);
 }
 
+/* A toggle on its own, like Side pane: pressed, it looks it. */
+.results-toolbar > button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-bright);
+}
+
+.results-toolbar > button[aria-pressed="true"] > svg {
+  color: var(--accent-bright);
+}
+
 /* A collection's sections: tabs under its name. */
 .tabs {
   display: flex;
@@ -1483,6 +1493,8 @@ button.link {
 }
 
 .pager {
+  flex-wrap: wrap;
+  white-space: nowrap;
   justify-content: space-between;
   padding: 0.4rem 1.25rem;
   border-top: 1px solid var(--border);
@@ -1524,21 +1536,38 @@ button.link {
 }
 
 .detail {
+  position: relative;
   flex: none;
   width: 42%;
-  min-width: 20rem;
-  max-width: 44rem;
-  resize: horizontal;
-  direction: rtl; /* puts the resize handle on the inner edge */
-  overflow: auto;
+  min-width: 18rem;
+  /* A narrower window keeps some of the list in view. */
+  max-width: calc(100% - 30rem);
+  overflow: hidden;
   border-left: 1px solid var(--border);
   background: var(--surface);
   display: flex;
   flex-direction: column;
 }
 
-.detail > * {
-  direction: ltr;
+.detail[hidden] {
+  display: none;
+}
+
+/* The pane's left edge: dragged, it makes the pane wider or narrower. */
+.pane-resizer {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 6px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-resizer:hover,
+.pane-resizer:focus-visible {
+  outline: none;
+  background: linear-gradient(to right, var(--accent-bright) 2px, transparent 2px);
 }
 
 /* One page of the side pane: a document, Explain or Statement; it scrolls
@@ -1555,17 +1584,28 @@ button.link {
   display: none;
 }
 
-/* With more than one page open, tabs choose the one in front. */
+/* The pane's tabs choose the page in front; the button at the end hides it. */
 .side-tabs {
   flex: none;
   display: flex;
-  gap: 0.25rem;
-  padding: 0.4rem 0.75rem 0;
+  align-items: center;
+  padding: 0.4rem 0.5rem 0 0.75rem;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
 }
 
-.side-tabs button {
+.side-tabs [role="tablist"] {
+  display: flex;
+  align-self: flex-end;
+  gap: 0.25rem;
+  margin-right: auto;
+}
+
+.side-tabs > button {
+  margin-bottom: 0.2rem;
+}
+
+.side-tabs [role="tab"] {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -1579,17 +1619,17 @@ button.link {
   font-weight: 600;
 }
 
-.side-tabs button:hover:not(:disabled) {
+.side-tabs [role="tab"]:hover:not(:disabled) {
   color: var(--text);
   background: none;
 }
 
-.side-tabs button[aria-selected="true"] {
+.side-tabs [role="tab"][aria-selected="true"] {
   color: var(--text);
   border-bottom-color: var(--accent-bright);
 }
 
-.side-tabs button[aria-selected="true"] svg {
+.side-tabs [role="tab"][aria-selected="true"] svg {
   color: var(--accent);
 }
 

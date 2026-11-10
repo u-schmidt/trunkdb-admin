@@ -4,6 +4,8 @@ import {
   Columns3,
   FileJson,
   Group,
+  PanelRight,
+  PanelRightClose,
   Plus,
   RefreshCw,
   Route,
@@ -12,6 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDraftGuard } from "../../app/DraftGuard";
 import { ErrorNotice } from "../../components/ErrorNotice";
+import { PaneResizer } from "../../components/PaneResizer";
 import { useBackend } from "../../ipc/BackendContext";
 import type {
   AppError,
@@ -38,10 +41,16 @@ import { useCollectionQuery } from "./useCollectionQuery";
 import { useDocumentDraft } from "./useDocumentDraft";
 import { useExplain } from "./useExplain";
 import { useGroups, type GroupSettings } from "./useGroups";
+import { loadSidePaneLayout, saveSidePaneLayout, type SidePaneLayout } from "./sidePaneLayout";
 
 type View = "json" | "table" | "groups";
 /** What the pane beside the list shows: a document, Explain or Statement. */
 type SidePage = "document" | "explain" | "statement";
+const SIDE_PAGES: SidePage[] = ["document", "explain", "statement"];
+
+/** The narrowest the side pane gets, and what it leaves the list at least. */
+const PANE_MIN = 288;
+const LIST_MIN = 480;
 
 interface Props {
   sessionId: string;
@@ -60,9 +69,20 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
   const [view, setView] = useState<View>("json");
   const [dismissed, setDismissed] = useState<object | null>(null);
   const [choosing, setChoosing] = useState(false);
-  const [statementOpen, setStatementOpen] = useState(false);
-  // The page of the side pane in front, when more than one is open.
+  // The side pane: shown or not, its width, and the page in front.
+  const [layout, setLayout] = useState<SidePaneLayout>(loadSidePaneLayout);
+  useEffect(() => saveSidePaneLayout(layout), [layout]);
+  const paneOpen = layout.open;
+  const showPane = (open: boolean) => setLayout((previous) => ({ ...previous, open }));
   const [sidePage, setSidePage] = useState<SidePage>("document");
+  const documentsRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
+  const setPaneWidth = (width: number) => {
+    const total = documentsRef.current?.clientWidth ?? 0;
+    const most = total > 0 ? Math.max(PANE_MIN, total - LIST_MIN) : Infinity;
+    const clamped = Math.round(Math.min(most, Math.max(PANE_MIN, width)));
+    setLayout((previous) => ({ ...previous, width: clamped }));
+  };
   const groups = useGroups(sessionId, collection.name);
   const grouped = view === "groups";
 
@@ -138,10 +158,12 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
       ? { error, text: requestedText }
       : null;
 
-  // While open, Explain follows what is shown: every new page of the list
-  // or of the groups is explained again (its query runs twice then).
+  // While its tab is in front, Explain follows what is shown: every new
+  // page of the list or of the groups is explained again (its query runs
+  // twice then). Behind another tab, or with the pane hidden, it rests.
   const explain = useExplain();
   const explainOpen = explain.state.status !== "closed";
+  const explainShown = paneOpen && sidePage === "explain";
   const runExplain = explain.run;
   const subject: QueryResult | GroupResult | null = grouped ? groups.result : result;
   const explained = useRef<QueryResult | GroupResult | null>(null);
@@ -168,15 +190,19 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
     listRequest,
     requestFor,
   ]);
+  const closeExplain = explain.close;
   useEffect(() => {
-    if (!explainOpen || subject === null || explained.current === subject) return;
+    if (!explainShown) {
+      if (explainOpen) {
+        explained.current = null;
+        closeExplain();
+      }
+      return;
+    }
+    if (subject === null || explained.current === subject) return;
     explained.current = subject;
     explainSubject();
-  }, [explainOpen, subject, explainSubject]);
-  const closeExplain = () => {
-    explained.current = null;
-    explain.close();
-  };
+  }, [explainShown, explainOpen, subject, explainSubject, closeExplain]);
 
   // A write or a Refresh: the documents may differ, so their paths are
   // read again on next need.
@@ -213,6 +239,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
     if (result === null || row === undefined || row.id === draft?.id) return;
     guard.requestLeave(() => {
       setSidePage("document");
+      showPane(true);
       editor.open(row.id);
     });
   };
@@ -220,42 +247,15 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
   const newDocument = () =>
     guard.requestLeave(() => {
       setSidePage("document");
+      showPane(true);
       editor.openNew();
     });
 
-  // The side pane's pages that are open, in a fixed order; the chosen one
-  // is in front, or the first open one once it closed.
-  const statementShown = statementOpen && subject !== null;
-  const openPages: SidePage[] = [
-    ...(draft !== null || editor.opening ? (["document"] as const) : []),
-    ...(explainOpen ? (["explain"] as const) : []),
-    ...(statementShown ? (["statement"] as const) : []),
-  ];
-  const frontPage: SidePage | null = openPages.includes(sidePage)
-    ? sidePage
-    : (openPages[0] ?? null);
-
-  // Open and in front: closes. Open behind another page: comes to the front.
-  const toggleExplain = () => {
-    if (explainOpen && frontPage !== "explain") {
-      setSidePage("explain");
-    } else if (explainOpen) {
-      explained.current = null;
-      explain.close();
-    } else if (subject !== null) {
-      explained.current = subject;
-      explainSubject();
-      setSidePage("explain");
-    }
-  };
-  const toggleStatement = () => {
-    if (statementOpen && frontPage !== "statement") {
-      setSidePage("statement");
-    } else {
-      setStatementOpen(!statementOpen);
-      setSidePage("statement");
-    }
-  };
+  const statementShown = paneOpen && sidePage === "statement" && subject !== null;
+  /** Said in the Explain and Statement tabs while there is nothing to read. */
+  const nothingYet = grouped
+    ? "Run groups first."
+    : "Once the documents are listed, this is about them.";
 
   let body;
   if (grouped) {
@@ -317,7 +317,7 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
   }
 
   return (
-    <div className="documents">
+    <div className="documents" ref={documentsRef}>
       <div className="documents-list">
         <FilterBuilder
           appliedFilter={applied.filter}
@@ -384,30 +384,6 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             </button>
           )}
           {loading && result !== null && <span className="muted">Loading…</span>}
-          <button
-            type="button"
-            onClick={toggleExplain}
-            disabled={subject === null}
-            aria-pressed={explainOpen}
-            title={subject === null && grouped ? "Run groups first" : undefined}
-          >
-            <Route aria-hidden="true" />
-            Explain
-          </button>
-          <button
-            type="button"
-            onClick={toggleStatement}
-            disabled={subject === null}
-            aria-pressed={statementOpen}
-            title={
-              subject === null && grouped
-                ? "Run groups first"
-                : "The query trunkdb is asked for, as its Rust API"
-            }
-          >
-            <CodeXml aria-hidden="true" />
-            Statement
-          </button>
           {!grouped && (
             <CopyCommand
               makeCommand={() =>
@@ -419,6 +395,15 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
           <button type="button" onClick={refresh} disabled={loading}>
             <RefreshCw aria-hidden="true" />
             Refresh
+          </button>
+          <button
+            type="button"
+            aria-pressed={paneOpen}
+            onClick={() => showPane(!paneOpen)}
+            title="The document, Explain and Statement, beside the list"
+          >
+            <PanelRight aria-hidden="true" />
+            Side pane
           </button>
         </div>
         {choosing && view === "table" && (
@@ -466,57 +451,83 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
           />
         )}
       </div>
-      {frontPage !== null && (
-        <div className="detail">
-          {openPages.length > 1 && (
-            <div role="tablist" aria-label="Side pane" className="side-tabs">
-              {openPages.map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  role="tab"
-                  aria-selected={page === frontPage}
-                  onClick={() => setSidePage(page)}
-                >
-                  {page === "document" ? (
-                    <FileJson aria-hidden="true" />
-                  ) : page === "explain" ? (
-                    <Route aria-hidden="true" />
-                  ) : (
-                    <CodeXml aria-hidden="true" />
-                  )}
-                  {page === "document"
-                    ? draft?.id === null
-                      ? "New document"
-                      : "Document"
-                    : page === "explain"
-                      ? "Explain"
-                      : "Statement"}
-                </button>
-              ))}
-            </div>
-          )}
-          {draft !== null ? (
-            <DocumentEditor
-              collection={collection.name}
-              editor={editor}
-              readOnly={!canMutate}
-              onRequestClose={() => guard.requestLeave(editor.close)}
-              hidden={frontPage !== "document"}
-            />
-          ) : (
-            editor.opening && (
-              <aside
-                className="side-page"
-                aria-label="Document editor"
-                hidden={frontPage !== "document"}
+      {/* Hidden rather than unmounted: an unsaved document survives a
+          hidden pane, as it does another tab in front. */}
+      <div
+        ref={paneRef}
+        className="detail"
+        hidden={!paneOpen}
+        style={layout.width !== null ? { width: layout.width } : undefined}
+      >
+        <PaneResizer
+          label="side pane"
+          measure={() => paneRef.current?.getBoundingClientRect().width || PANE_MIN}
+          onWidth={setPaneWidth}
+        />
+        <div className="side-tabs">
+          <div role="tablist" aria-label="Side pane">
+            {SIDE_PAGES.map((page) => (
+              <button
+                key={page}
+                type="button"
+                role="tab"
+                aria-selected={page === sidePage}
+                onClick={() => setSidePage(page)}
               >
-                <p className="state muted">Loading document…</p>
-              </aside>
-            )
-          )}
-          {explain.state.status !== "closed" && (
-            <div className="side-page" hidden={frontPage !== "explain"}>
+                {page === "document" ? (
+                  <FileJson aria-hidden="true" />
+                ) : page === "explain" ? (
+                  <Route aria-hidden="true" />
+                ) : (
+                  <CodeXml aria-hidden="true" />
+                )}
+                {page === "document"
+                  ? draft?.id === null
+                    ? "New document"
+                    : "Document"
+                  : page === "explain"
+                    ? "Explain"
+                    : "Statement"}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="icon quiet"
+            aria-label="Hide side pane"
+            title="Hide side pane"
+            onClick={() => showPane(false)}
+          >
+            <PanelRightClose aria-hidden="true" />
+          </button>
+        </div>
+        {draft !== null ? (
+          <DocumentEditor
+            collection={collection.name}
+            editor={editor}
+            readOnly={!canMutate}
+            hidden={sidePage !== "document"}
+          />
+        ) : editor.opening ? (
+          <aside
+            className="side-page"
+            aria-label="Document editor"
+            hidden={sidePage !== "document"}
+          >
+            <p className="state muted">Loading document…</p>
+          </aside>
+        ) : (
+          <div className="side-page" hidden={sidePage !== "document"}>
+            <p className="state muted">
+              {canMutate
+                ? "Select a document in the list to see and edit it here, or make a new one."
+                : "Select a document in the list to see it here."}
+            </p>
+          </div>
+        )}
+        {sidePage === "explain" && (
+          <div className="side-page">
+            {explain.state.status !== "closed" ? (
               <ExplainPanel
                 state={explain.state}
                 sortField={applied.sort.field}
@@ -525,12 +536,15 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
                 indexes={collection.indexes}
                 hint={applied.hint}
                 onHint={query.setHint}
-                onClose={closeExplain}
               />
-            </div>
-          )}
-          {statementShown && (
-            <div className="side-page" hidden={frontPage !== "statement"}>
+            ) : (
+              <p className="state muted">{nothingYet}</p>
+            )}
+          </div>
+        )}
+        {sidePage === "statement" && (
+          <div className="side-page">
+            {statementShown ? (
               <StatementPanel
                 grouped={grouped}
                 subject={subject}
@@ -539,12 +553,13 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
                     ? backend.groupsStatement(requestFor(groupsAsked, groups.result?.page ?? 0, 0))
                     : backend.queryStatement(listRequest(0, result?.page ?? 0))
                 }
-                onClose={() => setStatementOpen(false)}
               />
-            </div>
-          )}
-        </div>
-      )}
+            ) : (
+              <p className="state muted">{nothingYet}</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

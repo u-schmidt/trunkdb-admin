@@ -10,20 +10,12 @@ interface Props {
   editor: DocumentDraft;
   /** The database is open read-only: the document is shown, not edited. */
   readOnly: boolean;
-  /** Leaving goes through the draft guard; the panel only asks. */
-  onRequestClose: () => void;
   /** Another page of the side pane is in front; the draft stays as typed. */
   hidden?: boolean;
 }
 
 /** The document being edited, beside the list it was opened from. */
-export function DocumentEditor({
-  collection,
-  editor,
-  readOnly,
-  onRequestClose,
-  hidden = false,
-}: Props) {
+export function DocumentEditor({ collection, editor, readOnly, hidden = false }: Props) {
   const { draft, dirty, saving, error } = editor;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const save = editor.save;
@@ -72,30 +64,20 @@ export function DocumentEditor({
         </span>
       </header>
 
-      {readOnly ? (
-        <div className="editor-actions">
-          <button type="button" onClick={onRequestClose}>
-            Close
-          </button>
-        </div>
-      ) : (
+      {!readOnly && (
         <div className="editor-actions">
           <button type="button" className="primary" onClick={() => void save()} disabled={saving}>
             <Save aria-hidden="true" />
             Save
           </button>
-          {dirty || isNew ? (
-            <button type="button" onClick={editor.cancel} disabled={saving}>
-              {isNew ? "Cancel" : "Discard changes"}
-            </button>
-          ) : (
-            <button type="button" onClick={onRequestClose} disabled={saving}>
-              Close
-            </button>
-          )}
           <button type="button" onClick={editor.format} disabled={saving}>
             Format
           </button>
+          {(dirty || isNew) && (
+            <button type="button" onClick={editor.cancel} disabled={saving}>
+              {isNew ? "Discard" : "Discard changes"}
+            </button>
+          )}
           <span className="spacer" />
           {!isNew && (
             <button

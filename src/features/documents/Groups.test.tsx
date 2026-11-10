@@ -16,6 +16,7 @@ import {
   sessionInfo,
 } from "../../test/fakeBackend";
 import { Workspace } from "../workspace/Workspace";
+import { showSidePage } from "../../test/sidePane";
 
 vi.mock("../../components/JsonEditor", async () => await import("../../test/PlainJsonEditor"));
 
@@ -176,13 +177,11 @@ describe("groups", () => {
     const backend = backendWith();
     const user = await openGroups(backend);
     expect(screen.queryByLabelText("Sort by")).not.toBeVisible();
-    const explain = screen.getByRole("button", { name: "Explain" });
-    expect(explain).toBeDisabled();
-    expect(explain).toHaveAttribute("title", "Run groups first");
+    await showSidePage(user, "Explain");
+    expect(screen.getByText("Run groups first.")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "JSON" }));
     expect(screen.getByLabelText("Sort by")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Explain" }));
     await screen.findByText(/read the primary index in sort order/);
     await user.click(screen.getByRole("button", { name: "Groups" }));
     expect(await screen.findByText("Run groups to see how they are made.")).toBeInTheDocument();
@@ -324,13 +323,12 @@ describe("groups", () => {
   it("shows the statement for the groups, and for the list after a switch", async () => {
     const backend = backendWith();
     const user = await openGroups(backend);
-    const statement = screen.getByRole("button", { name: "Statement" });
-    expect(statement).toBeDisabled();
+    await showSidePage(user, "Statement");
+    expect(screen.getByText("Run groups first.")).toBeVisible();
 
     await user.type(screen.getByLabelText("Group field 1"), "status");
     await user.click(screen.getByRole("button", { name: "Run groups" }));
     await groupTable();
-    await user.click(statement);
     expect(await screen.findByLabelText("Statement")).toHaveTextContent(
       'let aggregate = Aggregate::new().group_by("status");',
     );
@@ -354,7 +352,7 @@ describe("groups", () => {
       expect.objectContaining({ collection: "tasks", page: 0 }),
     );
 
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "Hide side pane" }));
     expect(screen.queryByLabelText("Statement")).not.toBeInTheDocument();
   });
 
@@ -404,11 +402,11 @@ describe("groups", () => {
       ),
     });
     const user = await openGroups(backend);
-    expect(screen.getByRole("button", { name: "Explain" })).toBeDisabled();
+    await showSidePage(user, "Explain");
+    expect(screen.getByText("Run groups first.")).toBeVisible();
     await user.type(screen.getByLabelText("Group field 1"), "status");
     await user.click(screen.getByRole("button", { name: "Run groups" }));
     await groupTable();
-    await user.click(screen.getByRole("button", { name: "Explain" }));
 
     const panel = await screen.findByRole("region", { name: "How these groups are made" });
     expect(lastExplained(backend)).toMatchObject({ group_by: ["status"], filter: { rows: [] } });

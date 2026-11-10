@@ -15,6 +15,7 @@ import {
   sessionInfo,
 } from "../../test/fakeBackend";
 import { Workspace } from "../workspace/Workspace";
+import { showSidePage } from "../../test/sidePane";
 
 vi.mock("../../components/JsonEditor", async () => await import("../../test/PlainJsonEditor"));
 
@@ -183,7 +184,7 @@ describe("chosen columns", () => {
     await user.click(screen.getByRole("button", { name: "Run" }));
     expect(lastQuery(backend)).toMatchObject({ select: ["name"], page: 0 });
 
-    await user.click(screen.getByRole("button", { name: "Explain" }));
+    await showSidePage(user, "Explain");
     await screen.findByText(/All 50 shown were built from the index entries alone/);
     expect(vi.mocked(backend.collectionExplain).mock.calls.at(-1)?.[1].select).toEqual(["name"]);
   });

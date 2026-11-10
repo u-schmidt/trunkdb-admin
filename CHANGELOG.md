@@ -14,10 +14,13 @@ Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.37.0.
   with the mode, file format and trunkdb release. The database has three
   pages in that column, Overview, Storage and Tools, each with its cards side
   by side where the window is wide enough.
-- **Explain and Statement beside the list:** they open in the pane on the
-  right, like a document, with tabs when more than one is open; the list
-  keeps its height. With much open above it, the documents column scrolls on
-  its own and the window stays put.
+- **A side pane beside the list:** the document, Explain and Statement are
+  its tabs; Side pane in the toolbar shows or hides it, and its left edge
+  makes it wider or narrower, both kept for the next start. Explain reads
+  only while its tab is in front. Hidden, the pane keeps an unsaved document;
+  the editor has no Close, and a new document is dropped with Discard. With
+  much open above the list, the documents column scrolls on its own and the
+  window stays put.
 - **trunkdb 0.37.0** instead of 0.30.0: file format 16, which the app's
   0.1.0 can't open once this version has written to a file. Among what comes
   with it: a sorted page that isn't full reads each document once, where it
@@ -37,11 +40,10 @@ Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.37.0.
   documents are those with such an element.
 - **Columns:** hide fields from whole documents instead of choosing the rest.
 - The browser preview's sample data names trunkdb 0.37.0 and file format 16.
-- **Layout:** Explain and Statement take at most a third of the height, and
-  a handle under them gives them more or less; the table shows IDs by their
-  start and end, the whole ID in the tooltip; the Groups view hides the list's
-  sort, and says to run groups before Explain; the collection header no longer
-  moves while field paths are read.
+- **Layout:** the table shows IDs by their start and end, the whole ID in the
+  tooltip; the Groups view hides the list's sort, and says to run groups
+  before Explain; the collection header no longer moves while field paths are
+  read.
 - **Look:** buttons carry icons beside their text (Lucide); selects are flat
   like the text fields, with the same height, border and arrow in both
   appearances.

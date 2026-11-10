@@ -92,7 +92,9 @@ describe("editing a document", () => {
     const panel = await editorPanel();
     expect(within(panel).getByText("id-1")).toBeVisible();
     expect(within(panel).getByRole("status")).toHaveTextContent("Saved");
-    expect(within(panel).getByRole("button", { name: "Close" })).toBeVisible();
+    // Hiding the side pane takes the place of Close.
+    expect(within(panel).queryByRole("button", { name: "Close" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "Document" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("saves the text exactly as typed and shows what was stored", async () => {
