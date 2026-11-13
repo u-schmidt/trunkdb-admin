@@ -179,15 +179,24 @@ fn an_export_imports_into_an_identical_database() {
     );
     assert!(copy.check().unwrap().is_ok());
 
-    // No temporary file remains, and no snapshot.
+    // No temporary file remains, and no snapshot; each open database
+    // has its WAL and trunkdb's four lock files.
     assert_eq!(
         entries(fx.dir.path()),
         [
             "copy.trunkdb",
+            "copy.trunkdb.gate",
+            "copy.trunkdb.letgo",
+            "copy.trunkdb.readers",
             "copy.trunkdb.wal",
+            "copy.trunkdb.writer",
             "export.jsonl",
             "fixture.trunkdb",
-            "fixture.trunkdb.wal"
+            "fixture.trunkdb.gate",
+            "fixture.trunkdb.letgo",
+            "fixture.trunkdb.readers",
+            "fixture.trunkdb.wal",
+            "fixture.trunkdb.writer",
         ]
     );
     fx.session
@@ -196,7 +205,7 @@ fn an_export_imports_into_an_identical_database() {
 }
 
 #[test]
-fn the_database_and_its_wal_are_refused_as_destinations_under_any_name() {
+fn the_database_its_wal_and_its_lock_files_are_refused_as_destinations_under_any_name() {
     let fx = populated();
     let dir = fx.dir.path();
     let wal = dir.join("fixture.trunkdb.wal");
@@ -224,6 +233,10 @@ fn the_database_and_its_wal_are_refused_as_destinations_under_any_name() {
         dotted,
         dir_symlink.join("fixture.trunkdb"),
         dir_symlink.join("fixture.trunkdb.wal"),
+        dir.join("fixture.trunkdb.writer"),
+        dir.join("fixture.trunkdb.readers"),
+        dir.join("fixture.trunkdb.gate"),
+        dir.join("fixture.trunkdb.letgo"),
     ] {
         for overwrite in [false, true] {
             let error = fx.session.export(&destination, overwrite).unwrap_err();
@@ -250,7 +263,11 @@ fn an_existing_file_is_replaced_only_on_request() {
     let refused = fx.session.export(&out, false).unwrap_err();
     assert_eq!(refused.category, ErrorCategory::AlreadyExists);
     assert_eq!(std::fs::read(&out).unwrap(), b"an earlier export");
-    assert_eq!(entries(fx.dir.path()).len(), 3, "no temporary file left");
+    assert_eq!(
+        entries(fx.dir.path()).len(),
+        7,
+        "the database, its WAL, its four lock files and the export: no temporary file left"
+    );
 
     let summary = fx.session.export(&out, true).unwrap();
     assert_eq!(summary.documents, 9);
@@ -259,7 +276,7 @@ fn an_existing_file_is_replaced_only_on_request() {
             .unwrap()
             .contains("\"people\"")
     );
-    assert_eq!(entries(fx.dir.path()).len(), 3);
+    assert_eq!(entries(fx.dir.path()).len(), 7);
 }
 
 #[test]

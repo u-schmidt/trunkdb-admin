@@ -106,7 +106,10 @@ describe("compact", () => {
     const databaseCompact = vi
       .fn<Backend["databaseCompact"]>()
       .mockRejectedValueOnce(
-        appError("busy", "Another read is still running. Try again in a moment."),
+        appError(
+          "busy",
+          "A read is still running, here or in another program. Try again once it is done.",
+        ),
       )
       .mockResolvedValue({ pages_before: 12, pages_after: 10, page_size: 8192 });
     const { user } = renderWorkspace(fakeBackend({ databaseCompact }));
@@ -116,7 +119,7 @@ describe("compact", () => {
     const dialog = await screen.findByRole("dialog", { name: "Compact the database?" });
 
     await user.click(within(dialog).getByRole("button", { name: "Compact" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Try again in a moment");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Try again once it is done");
     await user.click(within(dialog).getByRole("button", { name: "Compact" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

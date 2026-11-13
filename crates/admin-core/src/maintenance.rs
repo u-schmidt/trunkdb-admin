@@ -94,7 +94,7 @@ impl Session {
 }
 
 /// The files an export must never write to, and an import never read:
-/// a database and its WAL.
+/// a database, its WAL and its lock files.
 pub(crate) struct ProtectedFiles(Vec<PathBuf>);
 
 impl ProtectedFiles {
@@ -106,7 +106,11 @@ impl ProtectedFiles {
         Self(
             databases
                 .into_iter()
-                .flat_map(|database| [database.to_path_buf(), wal_of(database)])
+                .flat_map(|database| {
+                    [database.to_path_buf(), wal_of(database)]
+                        .into_iter()
+                        .chain(lock_files_of(database))
+                })
                 .collect(),
         )
     }
@@ -159,8 +163,8 @@ impl ProtectedFiles {
 
     fn refusal() -> AppError {
         AppError::invalid_input(
-            "The export cannot be written to the open database or its write-ahead log. \
-             Choose another file.",
+            "The export cannot be written to the open database, its write-ahead log or \
+             its lock files. Choose another file.",
         )
     }
 }
@@ -168,9 +172,19 @@ impl ProtectedFiles {
 /// Where trunkdb keeps a database's write-ahead log: beside it, as
 /// `<path>.wal`.
 pub(crate) fn wal_of(database: &Path) -> PathBuf {
-    let mut wal = database.as_os_str().to_os_string();
-    wal.push(".wal");
-    PathBuf::from(wal)
+    beside(database, ".wal")
+}
+
+/// The lock files trunkdb keeps beside a database (its SPEC §185,
+/// §189): made where missing by every open, never removed by trunkdb.
+pub(crate) fn lock_files_of(database: &Path) -> [PathBuf; 4] {
+    [".writer", ".readers", ".gate", ".letgo"].map(|suffix| beside(database, suffix))
+}
+
+fn beside(database: &Path, suffix: &str) -> PathBuf {
+    let mut path = database.as_os_str().to_os_string();
+    path.push(suffix);
+    PathBuf::from(path)
 }
 
 /// An export being written: a temporary file beside the destination,

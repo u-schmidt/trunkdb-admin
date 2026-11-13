@@ -3986,8 +3986,8 @@ dependencies = [
 
 [[package]]
 name = "trunkdb"
-version = "0.37.0"
-source = "git+https://github.com/u-schmidt/trunkdb.git?tag=v0.37.0#b3be82bd39fd603bd4665ee206588ab39e3a6ce0"
+version = "0.40.0"
+source = "git+https://github.com/u-schmidt/trunkdb.git?tag=v0.40.0#f4ae88cc506a604d5d205701d8b6ec77a302e285"
 dependencies = [
  "indexmap 2.14.2",
  "regex",

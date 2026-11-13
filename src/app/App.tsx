@@ -21,7 +21,10 @@ interface Failure {
   error: AppError;
   /** The file the failed action was about, if any. */
   path?: string | undefined;
-  /** It was an open for editing, so Open read-only may still work. */
+  /**
+   * It was an open for editing, so Open read-only may still work: where
+   * the file isn't writable, and beside another program's writer.
+   */
   editing?: boolean | undefined;
 }
 
@@ -210,7 +213,7 @@ function AppContent() {
 
   const notice = failure !== null && (
     <ErrorNotice error={failure.error} subject={failure.path} onDismiss={() => setFailure(null)}>
-      {failure.error.category === "permission_denied" &&
+      {(failure.error.category === "permission_denied" || failure.error.category === "locked") &&
         failure.editing === true &&
         failure.path !== undefined &&
         session === null && (

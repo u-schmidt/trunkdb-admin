@@ -5,7 +5,7 @@ tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
 ## Unreleased
 
-Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.37.0.
+Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.40.0.
 
 - **New look:** the logo's navy and petrol, and Plus Jakarta Sans, bundled
   with the app. An open database is laid out as an app window: a navy column
@@ -21,13 +21,20 @@ Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.37.0.
   the editor has no Close, and a new document is dropped with Discard. With
   much open above the list, the documents column scrolls on its own and the
   window stays put.
-- **trunkdb 0.37.0** instead of 0.30.0: file format 16, which the app's
-  0.1.0 can't open once this version has written to a file. Among what comes
-  with it: a sorted page that isn't full reads each document once, where it
-  read the collection a second time, after a compaction counts what each
-  index leaves out; and a compaction that frees no space still writes those
-  counts. Exports end with a line counting what they hold, which an import
-  checks.
+- **trunkdb 0.40.0** instead of 0.30.0: file format 17, which the app's
+  0.1.0 can't open once this version has opened a file for editing. Among
+  what comes with it: other programs read a file while it is open here for
+  editing, and write to one open here read-only, which reads what they wrote;
+  a read under way when they write says the data changed, and a refused open
+  for editing offers Open read-only. trunkdb keeps four lock files beside each
+  database (`.writer`, `.readers`, `.gate`, `.letgo`); an import removes those
+  of its temporary database, and an export never writes over them. A
+  write-ahead log that belongs to another copy of the file is refused with
+  its own message, nothing replayed. Also: a sorted page that isn't full
+  reads each document once, where it read the collection a second time,
+  after a compaction counts what each index leaves out; and a compaction that
+  frees no space still writes those counts. Exports end with a line counting
+  what they hold, which an import checks.
 - **Filter rows:** `starts with`, `is one of` / `is none of` (trunkdb's `in`
   and `not in`), and `is of kind` / `is not of kind`; text with these turns
   into rows and back.
@@ -39,7 +46,7 @@ Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.37.0.
   ordered by a field), and unwinding arrays to count their elements; a group's
   documents are those with such an element.
 - **Columns:** hide fields from whole documents instead of choosing the rest.
-- The browser preview's sample data names trunkdb 0.37.0 and file format 16.
+- The browser preview's sample data names trunkdb 0.40.0 and file format 17.
 - **Layout:** the table shows IDs by their start and end, the whole ID in the
   tooltip; the Groups view hides the list's sort, and says to run groups
   before Explain; the collection header no longer moves while field paths are

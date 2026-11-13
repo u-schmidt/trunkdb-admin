@@ -6,7 +6,7 @@
 //! closed and synced, and never in place of a file that is there.
 
 use crate::error::{AppError, AppResult, ErrorCategory};
-use crate::maintenance::{ProtectedFiles, wal_of};
+use crate::maintenance::{ProtectedFiles, lock_files_of, wal_of};
 use crate::session::SessionManager;
 use serde::Serialize;
 use std::fs::{File, OpenOptions};
@@ -100,7 +100,9 @@ impl SessionManager {
 /// A database being imported into: a temporary file beside the
 /// destination, which becomes the destination only through `publish`.
 /// Dropped unpublished — on any failure — it removes the temporary file
-/// and its WAL, and the destination is never made.
+/// and its WAL, and the destination is never made. Either way it removes
+/// the temporary database's lock files: nothing else opens it, and the
+/// destination gets its own at its first open.
 struct ImportTarget {
     destination: PathBuf,
     temporary: PathBuf,
@@ -209,6 +211,9 @@ impl Drop for ImportTarget {
             let _ = std::fs::remove_file(&self.temporary);
             let _ = std::fs::remove_file(wal_of(&self.temporary));
         }
+        for lock_file in lock_files_of(&self.temporary) {
+            let _ = std::fs::remove_file(lock_file);
+        }
     }
 }
 
@@ -255,5 +260,17 @@ mod tests {
         assert!(target.publish().is_err());
         assert!(!destination.exists());
         assert!(names(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn a_published_import_leaves_only_the_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("new.trunkdb");
+        let target = ImportTarget::create(&destination).unwrap();
+        drop(Database::open(&target.temporary).unwrap());
+
+        target.publish().unwrap();
+
+        assert_eq!(names(dir.path()), ["new.trunkdb"]);
     }
 }

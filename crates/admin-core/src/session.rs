@@ -2,7 +2,7 @@
 //!
 //! A `Session` is the only owner of its `trunkdb::Database`. Work borrows
 //! the handle for the length of one closure and never keeps a clone, so
-//! closing can wait for running work and then know the file lock is gone.
+//! closing can wait for running work and then know its file locks are gone.
 
 use crate::error::{AppError, AppResult, ErrorCategory};
 use serde::Serialize;
@@ -158,7 +158,7 @@ impl Session {
     }
 
     /// Refuses new work, waits for running work, then drops the database
-    /// and with it the file lock. Safe to call more than once.
+    /// and with it its file locks. Safe to call more than once.
     fn close(&self) {
         self.closing.store(true, Ordering::SeqCst);
         let database = self
@@ -216,7 +216,9 @@ impl SessionManager {
     /// Opens a database that must already exist without writing to it or
     /// its WAL (trunkdb SPEC §88): a WAL left by a crash is recovered in
     /// memory only, an older file is not stamped with the current format,
-    /// and the file only has to be readable. The lock is shared.
+    /// and the file only has to be readable. Other programs may read and
+    /// write beside it (trunkdb SPEC §185): a read takes the readers' lock
+    /// only while it runs.
     pub fn open_read_only(&self, path: &Path) -> AppResult<Arc<Session>> {
         self.open(path, true)
     }
@@ -311,7 +313,7 @@ impl SessionManager {
             .ok_or_else(AppError::session_closed)
     }
 
-    /// Closes the session and returns once its file lock is released.
+    /// Closes the session and returns once its file locks are released.
     pub fn close(&self, session_id: &str) -> AppResult<()> {
         let session = self
             .lock()
