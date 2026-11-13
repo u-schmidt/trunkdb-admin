@@ -200,14 +200,19 @@ fn an_import_makes_a_new_database_equal_to_the_exported_one() {
         summary.bytes,
         std::fs::metadata(&destination).unwrap().len()
     );
-    // Only the new file: no temporary file, no WAL.
+    // Only the new file: no temporary file, no WAL, no lock files. The
+    // open fixture has its WAL and trunkdb's four lock files.
     assert_eq!(
         entries(fx.dir.path()),
         [
             "fixture.trunkdb",
+            "fixture.trunkdb.gate",
+            "fixture.trunkdb.letgo",
+            "fixture.trunkdb.readers",
             "fixture.trunkdb.wal",
+            "fixture.trunkdb.writer",
             "shop.jsonl",
-            "shop.trunkdb"
+            "shop.trunkdb",
         ]
     );
     fx.manager.close(fx.session.id()).unwrap();

@@ -66,10 +66,22 @@ without a database: enough to look at the layout.
 
 ## Bundled trunkdb
 
-trunkdb is built into the app, pinned to the release tag `v0.37.0` in
+trunkdb is built into the app, pinned to the release tag `v0.40.0` in
 `Cargo.toml`; the start screen and the overview show the version and commit.
 The app opens what that trunkdb opens: every file an earlier trunkdb wrote, in
-the current format 16. A file the app writes to is in that format afterwards.
+the current format 17. A file the app opens for editing is in that format
+afterwards, and trunkdb 0.39.0 or older, or TrunkDB Admin 0.1.0, can't open it
+then; a read-only open leaves the format as it is.
+
+## Sharing a file with other programs
+
+While the app has a database open for editing, other programs using trunkdb
+0.40.0 or newer can read it at the same time, but not write to it. Opened
+read-only here, the file stays open to another program that writes: the app
+reads what it wrote, and a read that is under way when it writes stops with
+"The data changed while it was being read"; reading again shows the new state.
+trunkdb keeps four lock files beside each database it opens (`.writer`,
+`.readers`, `.gate`, `.letgo`) and leaves them there.
 
 ## Where it keeps things
 
@@ -79,9 +91,8 @@ else is stored outside your database files.
 
 ## Known limits
 
-- A read-only open still locks the file: while the app has it open, no other
-  program can write to it, and a file another program has open can't be
-  opened here.
+- A file another program has open for writing can be opened here read-only,
+  not for editing.
 - The groups are made anew for every page shown, and trunkdb holds them all in
   memory, so grouping by a field with a different value in every document
   makes as many groups as documents each time.

@@ -104,7 +104,7 @@ pub async fn database_create(state: State<'_, AppState>, path: PathBuf) -> AppRe
     .await
 }
 
-/// Returns once the session's file lock is released.
+/// Returns once the session's file locks are released.
 #[tauri::command]
 pub async fn session_close(state: State<'_, AppState>, session_id: String) -> AppResult<()> {
     let sessions = Arc::clone(&state.sessions);
@@ -366,7 +366,7 @@ pub fn app_set_unsaved_draft(state: State<'_, AppState>, unsaved: bool) {
 }
 
 /// Ends the app once the frontend has settled any unsaved draft. Waits
-/// for running database work and releases every file lock first.
+/// for running database work and releases every file's locks first.
 #[tauri::command]
 pub async fn app_quit(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
     let sessions = Arc::clone(&state.sessions);

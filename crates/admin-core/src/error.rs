@@ -183,6 +183,15 @@ impl AppError {
                  bundled trunkdb cannot read. A newer trunkdb probably left it after a crash; \
                  open the database with that one first."
             )),
+            // Left by a crash beside another copy of the file (trunkdb
+            // SPEC §183); trunkdb's detail names the WAL and what to do.
+            FormatError::WalNotThisFiles { .. } => unsupported(
+                "The write-ahead log beside this database belongs to another database file, \
+                 or to another copy of this one, so it is not replayed. Nothing was changed. \
+                 To open this file as it is, move the log aside; if it belongs to another copy, \
+                 put that copy back beside it and open that."
+                    .into(),
+            ),
             FormatError::NotAnObject { collection, id, .. } => unsupported(format!(
                 "Collection \u{201c}{collection}\u{201d} holds a document that is not an object \
                  ({id}). The bundled trunkdb requires every document to be an object. Open the \
@@ -233,9 +242,11 @@ impl From<trunkdb::Error> for AppError {
                 ErrorCategory::SnapshotExpired,
                 "The data changed while it was being read. Refresh and try again.",
             ),
+            // A read in this app, or a reader in another process
+            // (trunkdb SPEC §185.4), keeps a compaction out.
             Error::SnapshotOpen => (
                 ErrorCategory::Busy,
-                "Another read is still running. Try again in a moment.",
+                "A read is still running, here or in another program. Try again once it is done.",
             ),
             // The commit reached the log but not the file: its outcome is
             // decided by the next open, so nothing here may claim rollback.

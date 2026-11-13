@@ -32,7 +32,7 @@ trunkdb, through its public API
   database file itself; a missing capability is a change to trunkdb, not a
   workaround here.
 
-## Sessions and the file lock
+## Sessions and the file locks
 
 An open database is a `Session`, found by its id; every database command
 carries a `session_id`, and nothing uses a "current database". The session is
@@ -40,8 +40,15 @@ the only owner of the `trunkdb::Database`: `Session::read` and
 `Session::write` lend it to a closure and never hand it out. That is what
 makes closing reliable: closing marks the session as closing, so new work is
 refused instead of queued, waits for running work, and then drops the
-database, which releases trunkdb's file lock. Another process can open the
-file as soon as the app says it is closed.
+database, which releases trunkdb's locks. Another process can open the file
+for writing as soon as the app says it is closed.
+
+trunkdb's locks (its SPEC §185–§189) let one process write and others read
+beside it. An open for editing is that writer: other programs may read the
+file, none may write. A read-only session holds the readers' lock only while
+it reads, so another program may write between reads; the session reads what
+it wrote, and a read under way when it writes is asked to let go and fails
+with `SnapshotExpired`.
 
 Writes go one at a time per session. A session opened read-only refuses every
 write in `Session::write` with its own error category, and the frontend shows
@@ -120,7 +127,7 @@ action only after a successful save or a discard. Quitting is included:
   results are compared with direct trunkdb calls.
 - **Across processes:** `npm run test:cli` builds the `trunkdb` CLI at the
   pinned release and checks, as a second process, what the app wrote and
-  that the file lock comes and goes as it should.
+  that the locks let in readers and writers as they should.
 - **Frontend:** Vitest in jsdom against a fake backend, with the CodeMirror
   editor replaced by a plain text area; CodeMirror itself has its own tests.
 - **Not covered by tests:** the native dialogs, the menu, quitting and

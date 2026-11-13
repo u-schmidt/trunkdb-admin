@@ -44,7 +44,7 @@ export interface Backend {
   /** `readOnly` writes nothing to the file or its WAL. */
   databaseOpen(path: string, readOnly: boolean): Promise<Opened>;
   databaseCreate(path: string): Promise<Opened>;
-  /** Resolves once the file lock is released. */
+  /** Resolves once the file locks are released. */
   sessionClose(sessionId: string): Promise<void>;
   sessionOverview(sessionId: string): Promise<Overview>;
   collectionPrepare(sessionId: string, name: string): Promise<Overview>;

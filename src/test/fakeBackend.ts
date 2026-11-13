@@ -33,7 +33,7 @@ export function fakeBackend(overrides: Partial<Backend> = {}): Backend {
   return {
     appInfo: vi.fn(async () => ({
       app_version: "0.1.0",
-      trunkdb: { version: "0.37.0", revision: "b3be82bd39fd603bd4665ee206588ab39e3a6ce0" },
+      trunkdb: { version: "0.40.0", revision: "f4ae88cc506a604d5d205701d8b6ec77a302e285" },
     })),
     recentList: vi.fn(async () => []),
     recentRemove: vi.fn(async () => []),

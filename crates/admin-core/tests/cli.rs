@@ -1,7 +1,9 @@
 //! Cross-checks against the `trunkdb` command built from the pinned
 //! revision, run as a separate process: what the
-//! tool wrote is what trunkdb's own program reads, and the file lock holds
-//! between processes exactly while a session is open.
+//! tool wrote is what trunkdb's own program reads, and the locks between
+//! processes (trunkdb SPEC §185): while a session is open for editing,
+//! other programs read beside it but none writes; beside a read-only
+//! session they write too, except while it is reading.
 //!
 //! Ignored by default because they need that binary:
 //!
@@ -16,7 +18,7 @@ use common::Fixture;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Arc, mpsc};
-use trunkdb_admin_core::{FilterInput, IndexRequest, SaveRequest};
+use trunkdb_admin_core::{ErrorCategory, FilterInput, IndexRequest, SaveRequest};
 
 fn cli_path() -> PathBuf {
     std::env::var_os("TRUNKDB_CLI")
@@ -45,19 +47,23 @@ fn stdout(output: &Output) -> String {
     String::from_utf8(output.stdout.clone()).unwrap()
 }
 
-fn assert_locked(path: &str) {
-    for command in ["info", "check", "export", "compact"] {
-        let output = cli(&[command, path]);
-        assert!(
-            !output.status.success(),
-            "`trunkdb {command}` got in while the tool holds the file"
-        );
-        let message = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            message.contains("in use by another program"),
-            "{command}: {message}"
-        );
+/// While the tool has the file open for editing, trunkdb's reading
+/// commands get in and see what it committed; a writing one does not.
+fn assert_only_readers_get_in(path: &str) {
+    for command in ["info", "check", "export"] {
+        stdout(&cli(&[command, path]));
     }
+    assert_writers_kept_out(path);
+}
+
+fn assert_writers_kept_out(path: &str) {
+    let output = cli(&["compact", path]);
+    assert!(
+        !output.status.success(),
+        "`trunkdb compact` got in while the tool holds the file"
+    );
+    let message = String::from_utf8_lossy(&output.stderr);
+    assert!(message.contains("in use by another program"), "{message}");
 }
 
 fn save(id: Option<&str>, json: &str) -> SaveRequest {
@@ -85,7 +91,11 @@ fn the_cli_reads_what_the_tool_inserted_edited_and_deleted() {
         .unwrap()
         .document
         .id;
-    assert_locked(&path);
+    assert_only_readers_get_in(&path);
+    assert!(
+        stdout(&cli(&["export", &path])).contains(&id),
+        "a reader sees the insert while the session is open"
+    );
     fx.manager.close(fx.session.id()).unwrap();
 
     let exported = stdout(&cli(&["export", &path]));
@@ -106,7 +116,7 @@ fn the_cli_reads_what_the_tool_inserted_edited_and_deleted() {
         .save_document(&save(Some(&id), r#"{"name": "Ann B.", "tags": ["x"]}"#))
         .unwrap();
     fx.reopen();
-    assert_locked(&path);
+    assert_only_readers_get_in(&path);
     fx.manager.close(fx.session.id()).unwrap();
 
     let exported = stdout(&cli(&["export", &path]));
@@ -133,11 +143,11 @@ fn the_cli_reads_what_the_tool_inserted_edited_and_deleted() {
 
 #[test]
 #[ignore = "needs the pinned trunkdb CLI: run scripts/install-pinned-cli.sh"]
-fn another_process_gets_in_only_after_close_even_with_work_still_running() {
+fn another_writer_gets_in_only_after_close_even_with_work_still_running() {
     let fx = Fixture::new();
     let path = fx.path.to_str().unwrap().to_string();
     fx.insert("people", &[r#"{"name": "Ann"}"#]);
-    assert_locked(&path);
+    assert_only_readers_get_in(&path);
 
     // A command still working when the close is requested.
     let (started_tx, started_rx) = mpsc::channel();
@@ -161,18 +171,20 @@ fn another_process_gets_in_only_after_close_even_with_work_still_running() {
     });
     std::thread::sleep(std::time::Duration::from_millis(150));
 
-    assert_locked(&path);
+    assert_writers_kept_out(&path);
 
     finish_tx.send(()).unwrap();
     closer.join().unwrap();
     worker.join().unwrap().unwrap();
+    stdout(&cli(&["compact", &path]));
     assert!(stdout(&cli(&["info", &path])).contains("people"));
 
     // And after "quit": every session closed at once.
     let reopened = manager.open_existing(Path::new(&path)).unwrap();
-    assert_locked(&path);
+    assert_only_readers_get_in(&path);
     drop(reopened);
     manager.close_all();
+    stdout(&cli(&["compact", &path]));
     stdout(&cli(&["check", &path]));
 }
 
@@ -230,22 +242,64 @@ fn index(collection: &str, fields: &[&str], unique: bool, sparse: bool) -> Index
 
 #[test]
 #[ignore = "needs the pinned trunkdb CLI: run scripts/install-pinned-cli.sh"]
-fn a_read_only_session_shares_the_file_with_reading_commands_only() {
+fn a_read_only_session_reads_beside_other_programs_and_follows_their_writes() {
     let mut fx = Fixture::new();
     let path = fx.path.to_str().unwrap().to_string();
-    fx.insert("people", &[r#"{"name": "Ann"}"#]);
+    fx.insert("people", &[r#"{"name": "Ann"}"#, r#"{"name": "Bob"}"#]);
     fx.manager.close(fx.session.id()).unwrap();
     fx.session = fx.manager.open_read_only(&fx.path).unwrap();
 
-    // trunkdb's reading commands open read-only too, so they get in.
+    // trunkdb's reading commands get in.
     assert!(stdout(&cli(&["info", &path])).contains("people"));
     stdout(&cli(&["check", &path]));
-    assert!(stdout(&cli(&["export", &path])).contains("Ann"));
-    // A command that writes does not.
-    let compact = cli(&["compact", &path]);
-    assert!(!compact.status.success(), "`trunkdb compact` got in");
-    let message = String::from_utf8_lossy(&compact.stderr);
-    assert!(message.contains("in use by another program"), "{message}");
+    let exported = stdout(&cli(&["export", &path]));
+    assert!(exported.contains("Ann"));
+
+    // So do writing ones while the session isn't reading, and it reads
+    // what they wrote: an import into the file, then a compaction.
+    let export = fx.dir.path().join("pets.jsonl");
+    std::fs::write(&export, exported.replace("people", "pets")).unwrap();
+    stdout(&cli(&["import", &path, export.to_str().unwrap()]));
+    stdout(&cli(&["compact", &path]));
+    let names: Vec<String> = fx
+        .session
+        .overview()
+        .unwrap()
+        .collections
+        .into_iter()
+        .map(|collection| collection.name)
+        .collect();
+    assert_eq!(names, ["people", "pets"]);
+    assert!(fx.session.check().unwrap().problems.is_empty());
+
+    // A read under way doesn't keep a writer out: trunkdb asks it to let
+    // go (its SPEC §189), and it fails as expired. The next read sees
+    // what was written.
+    let (started_tx, started_rx) = mpsc::channel();
+    let (finish_tx, finish_rx) = mpsc::channel::<()>();
+    let reader = std::thread::spawn({
+        let session = Arc::clone(&fx.session);
+        move || {
+            session.read(|db| {
+                let snapshot = db.snapshot()?;
+                started_tx.send(()).unwrap();
+                finish_rx.recv().unwrap();
+                Ok(snapshot.collections()?)
+            })
+        }
+    });
+    started_rx.recv().unwrap();
+    stdout(&cli(&["delete", &path, "pets", r#"name = "Ann""#]));
+    stdout(&cli(&["compact", &path]));
+    finish_tx.send(()).unwrap();
+    let expired = reader.join().unwrap().unwrap_err();
+    assert_eq!(
+        expired.category,
+        ErrorCategory::SnapshotExpired,
+        "{expired}"
+    );
+    let pets = fx.session.overview().unwrap().collections[1].count;
+    assert_eq!(pets, Some(1));
 
     fx.manager.close(fx.session.id()).unwrap();
     stdout(&cli(&["compact", &path]));

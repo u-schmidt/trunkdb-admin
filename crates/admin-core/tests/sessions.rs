@@ -26,10 +26,10 @@ fn entries(dir: &TempDir) -> Vec<String> {
 
 #[test]
 fn the_bundled_trunkdb_is_the_pinned_one() {
-    assert_eq!(TrunkdbBuild::CURRENT.version, "0.37.0");
+    assert_eq!(TrunkdbBuild::CURRENT.version, "0.40.0");
     assert_eq!(
         TrunkdbBuild::CURRENT.revision,
-        "b3be82bd39fd603bd4665ee206588ab39e3a6ce0"
+        "f4ae88cc506a604d5d205701d8b6ec77a302e285"
     );
 }
 
@@ -156,11 +156,11 @@ fn a_file_format_the_bundled_trunkdb_cannot_read_says_which() {
     for (version, words) in [
         (
             9999,
-            "file format 9999, newer than the bundled trunkdb reads (16)",
+            "file format 9999, newer than the bundled trunkdb reads (17)",
         ),
         (
             5,
-            "file format 5; the bundled trunkdb reads formats 6 to 16",
+            "file format 5; the bundled trunkdb reads formats 6 to 17",
         ),
         (0, "before file formats had versions"),
     ] {
@@ -179,9 +179,9 @@ fn a_file_format_the_bundled_trunkdb_cannot_read_says_which() {
 #[test]
 fn a_write_ahead_log_the_bundled_trunkdb_cannot_read_says_so() {
     let mut newer = b"TRUNKWAL".to_vec();
-    newer.extend_from_slice(&4u32.to_le_bytes());
+    newer.extend_from_slice(&5u32.to_le_bytes());
     for (wal, words) in [
-        (newer, "has version 4"),
+        (newer, "has version 5"),
         (b"another program's log".to_vec(), "not a trunkdb log"),
     ] {
         let (_dir, path) = changed_database("logged.trunkdb", |_| {});
@@ -198,6 +198,45 @@ fn a_write_ahead_log_the_bundled_trunkdb_cannot_read_says_so() {
             "the log is left as it is"
         );
     }
+}
+
+#[test]
+fn a_write_ahead_log_of_another_database_is_not_replayed() {
+    // A WAL with a batch in it, copied while its database is open, as a
+    // crash would leave it, then put beside another database.
+    let (dir, other) = scratch("other.trunkdb");
+    let writer = Database::open(&other).unwrap();
+    let ann: Document = r#"{"name": "Ann"}"#.parse().unwrap();
+    writer.collection::<Document>("people").insert(ann).unwrap();
+    let wal = std::fs::read(format!("{}.wal", other.display())).unwrap();
+    assert!(!wal.is_empty(), "the batch is still in the log");
+    drop(writer);
+
+    let path = dir.path().join("this.trunkdb");
+    let manager = SessionManager::new();
+    let session = manager.create_new(&path).unwrap();
+    manager.close(session.id()).unwrap();
+    let wal_path = PathBuf::from(format!("{}.wal", path.display()));
+    std::fs::write(&wal_path, &wal).unwrap();
+    let before = std::fs::read(&path).unwrap();
+
+    let error = SessionManager::new().open_existing(&path).err().unwrap();
+
+    assert_eq!(error.category, ErrorCategory::UnsupportedFormat, "{error}");
+    assert!(
+        error.message.contains("belongs to another database file"),
+        "{error}"
+    );
+    assert!(
+        error.detail.unwrap().contains(".stale"),
+        "trunkdb's words are kept"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(
+        std::fs::read(&wal_path).unwrap(),
+        wal,
+        "the log is left as it is"
+    );
 }
 
 #[test]

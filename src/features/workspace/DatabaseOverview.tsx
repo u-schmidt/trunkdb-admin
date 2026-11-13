@@ -42,9 +42,9 @@ export function DatabaseOverview({ path, file, appInfo, collections, canMutate, 
               "For editing"
             ) : (
               <>
-                Read-only. Nothing is written to the file or its write-ahead log. Other read-only
-                opens can share the file; programs can&apos;t open it to write while it is open
-                here. To change it, use Open for editing.
+                Read-only. Nothing is written to the file or its write-ahead log. Other programs can
+                read and write the file meanwhile; what they write shows here the next time it is
+                read. To change it, use Open for editing.
               </>
             )}
           </dd>

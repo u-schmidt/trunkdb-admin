@@ -98,6 +98,23 @@ describe("opening read-only", () => {
     expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, true);
   });
 
+  it("offers Open read-only when another program has the file open for writing", async () => {
+    const backend = shopBackend({
+      databaseOpen: vi.fn(async (path: string, readOnly: boolean) => {
+        if (!readOnly) throw appError("locked", "The database is in use by another program.");
+        return fakeBackend().databaseOpen(path, readOnly);
+      }),
+    });
+    const user = renderApp(backend);
+    await user.click(await screen.findByRole("button", { name: "Open database…" }));
+
+    const alert = await screen.findByRole("alert");
+    await user.click(within(alert).getByRole("button", { name: "Open read-only" }));
+
+    await readOnlyHeading();
+    expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, true);
+  });
+
   it("offers nothing more when a read-only open is not permitted either", async () => {
     const backend = shopBackend({
       databaseOpen: vi.fn(async () => {
