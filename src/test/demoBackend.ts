@@ -240,12 +240,12 @@ export function demoBackend(): Backend {
   const readOnlyPaths = new Set<string>(["/Users/demo/Backups/tasks-2026-10-01.trunkdb"]);
   let readOnly = false;
   const recents = () =>
-    [PATH, ...readOnlyPaths, "/Users/demo/old/gone.trunkdb"]
+    [PATH, ...readOnlyPaths, ARCHIVE, "/Users/demo/old/gone.trunkdb"]
       .filter((path, at, all) => all.indexOf(path) === at)
       .map((path) => recentFile(path, !path.includes("gone"), readOnlyPaths.has(path)));
   // As the storage report below has it: a file an older trunkdb made,
   // which this one has written since.
-  const file = {
+  const upgraded = {
     format_version: 17,
     page_size: 8192,
     pages: 214,
@@ -253,6 +253,15 @@ export function demoBackend(): Backend {
     created_by: "0.24.0",
     written_by: "0.40.0",
   };
+  // The archived file is still as trunkdb 0.24.0 left it, until it is
+  // opened for editing with the upgrade.
+  const ARCHIVE = "/Users/demo/Archive/notes-2024.trunkdb";
+  let archiveUpgraded = false;
+  const fileOf = (path: string) =>
+    path === ARCHIVE && !archiveUpgraded
+      ? { ...upgraded, format_version: 12, written_by: "0.24.0" }
+      : upgraded;
+  let file = upgraded;
   const overview = (): Overview => ({
     file,
     collections: [
@@ -279,7 +288,7 @@ export function demoBackend(): Backend {
     recentRemove: async (path) => recents().filter((entry) => entry.path !== path),
     pickDatabaseToOpen: async () => PATH,
     pickDatabaseToCreate: async () => "/Users/demo/Documents/new.trunkdb",
-    databaseOpen: async (path, asReadOnly) => {
+    databaseOpen: async (path, asReadOnly, upgrade = false) => {
       if (path.includes("gone")) {
         throw { category: "file_not_found", message: "The file cannot be opened.", detail: null };
       }
@@ -290,11 +299,26 @@ export function demoBackend(): Backend {
           detail: "Permission denied (os error 13)",
         };
       }
+      if (path === ARCHIVE && !asReadOnly) {
+        if (!upgrade && !archiveUpgraded) {
+          throw {
+            category: "format_upgrade",
+            message: "Opening this file for editing would change its format from 12 to 17.",
+            detail: null,
+          };
+        }
+        archiveUpgraded = true;
+      }
+      file = fileOf(path);
       readOnly = asReadOnly;
       if (asReadOnly) readOnlyPaths.add(path);
       else readOnlyPaths.delete(path);
       return { session: { ...sessionInfo(path, "s1", asReadOnly), file }, recent: recents() };
     },
+    databaseFormatUpgrade: async (path) =>
+      path === ARCHIVE && !archiveUpgraded
+        ? { format_version: 12, written_by: "0.24.0", becomes: 17, bundled_release: "0.40.0" }
+        : null,
     databaseCreate: async (path) => ({ session: sessionInfo(path), recent: [recentFile(path)] }),
     sessionClose: async () => undefined,
     sessionOverview: () => later(overview()),

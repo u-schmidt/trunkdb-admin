@@ -7,7 +7,7 @@ use std::sync::{Arc, mpsc};
 use std::time::Duration;
 use tempfile::TempDir;
 use trunkdb::{Database, Document};
-use trunkdb_admin_core::{ErrorCategory, SessionManager, TrunkdbBuild};
+use trunkdb_admin_core::{BUNDLED_FORMAT, ErrorCategory, SessionManager, TrunkdbBuild};
 
 fn scratch(name: &str) -> (TempDir, PathBuf) {
     let dir = tempfile::tempdir().unwrap();
@@ -174,6 +174,75 @@ fn a_file_format_the_bundled_trunkdb_cannot_read_says_which() {
         assert!(error.detail.is_some(), "trunkdb's words are kept");
         assert_eq!(std::fs::read(&path).unwrap(), before);
     }
+}
+
+#[test]
+fn a_new_database_has_the_bundled_format() {
+    let (_dir, path) = changed_database("new.trunkdb", |_| {});
+    let manager = SessionManager::new();
+
+    let session = manager.open_existing(&path).unwrap();
+
+    assert_eq!(session.file_info().unwrap().format_version, BUNDLED_FORMAT);
+    assert_eq!(manager.format_upgrade(&path).unwrap(), None);
+}
+
+/// A copy of a database trunkdb 0.24.0 wrote, file format 12
+/// (`tests/fixtures/README.md`).
+fn written_by_0_24() -> (tempfile::TempDir, PathBuf) {
+    let (dir, path) = scratch("older.trunkdb");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/written-by-0.24.0.trunkdb");
+    std::fs::copy(fixture, &path).unwrap();
+    (dir, path)
+}
+
+#[test]
+fn an_older_format_is_raised_only_when_asked() {
+    let (_dir, path) = written_by_0_24();
+    let before = std::fs::read(&path).unwrap();
+    let manager = SessionManager::new();
+
+    let upgrade = manager.format_upgrade(&path).unwrap().unwrap();
+    assert_eq!(
+        (upgrade.format_version, upgrade.becomes),
+        (12, BUNDLED_FORMAT)
+    );
+    assert_eq!(upgrade.written_by.as_deref(), Some("0.24.0"));
+    assert_eq!(upgrade.bundled_release, TrunkdbBuild::CURRENT.version);
+    let refused = manager.open_existing(&path).err().unwrap();
+    assert_eq!(refused.category, ErrorCategory::FormatUpgrade, "{refused}");
+    assert!(refused.message.contains("from 12 to 17"), "{refused}");
+    assert_eq!(std::fs::read(&path).unwrap(), before, "nothing written");
+
+    let read_only = manager.open_read_only(&path).unwrap();
+    assert_eq!(read_only.file_info().unwrap().format_version, 12);
+    assert!(
+        manager.format_upgrade(&path).unwrap().is_some(),
+        "asked of the open session"
+    );
+    manager.close(read_only.id()).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), before, "nothing written");
+
+    let editing = manager.open_upgrading(&path).unwrap();
+    assert_eq!(editing.file_info().unwrap().format_version, BUNDLED_FORMAT);
+    manager.close(editing.id()).unwrap();
+    assert_eq!(manager.format_upgrade(&path).unwrap(), None);
+    manager.open_existing(&path).unwrap();
+}
+
+#[test]
+fn asking_about_an_upgrade_needs_an_existing_database() {
+    let (dir, path) = scratch("missing.trunkdb");
+    let manager = SessionManager::new();
+    let missing = manager.format_upgrade(&path).unwrap_err();
+    assert_eq!(missing.category, ErrorCategory::FileNotFound, "{missing}");
+
+    let empty = dir.path().join("empty.trunkdb");
+    std::fs::write(&empty, b"").unwrap();
+    let error = manager.format_upgrade(&empty).unwrap_err();
+    assert_eq!(error.category, ErrorCategory::NotADatabase, "{error}");
+    assert_eq!(entries(&dir), ["empty.trunkdb"], "nothing created");
 }
 
 #[test]

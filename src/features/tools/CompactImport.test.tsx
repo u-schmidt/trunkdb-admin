@@ -160,7 +160,7 @@ describe("import", () => {
       "/exports/shop.jsonl",
       "/data/shop.trunkdb",
     );
-    expect(backend.databaseOpen).toHaveBeenCalledWith("/data/shop.trunkdb", false);
+    expect(backend.databaseOpen).toHaveBeenCalledWith("/data/shop.trunkdb", false, false);
     expect(screen.getByText(/into this new database/)).toHaveTextContent(
       "2 collections and 4 documents",
     );

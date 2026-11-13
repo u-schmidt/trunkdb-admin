@@ -38,7 +38,7 @@ describe("start screen", () => {
     await user.click(await screen.findByRole("button", { name: "Open database…" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "shop.trunkdb" })).toBeVisible();
-    expect(backend.databaseOpen).toHaveBeenCalledWith("/data/shop.trunkdb", false);
+    expect(backend.databaseOpen).toHaveBeenCalledWith("/data/shop.trunkdb", false, false);
     const file = screen.getByRole("region", { name: "File" });
     const fact = (name: string) =>
       within(file).getByText(name, { selector: "dt" }).nextElementSibling;

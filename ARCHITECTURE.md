@@ -50,6 +50,14 @@ it reads, so another program may write between reads; the session reads what
 it wrote, and a read under way when it writes is asked to let go and fails
 with `SnapshotExpired`.
 
+An open for editing never raises a file's format unasked: trunkdb's writer
+stamps the bundled format as it opens, so `SessionManager::open_existing`
+looks at the file read-only first and refuses an older one with
+`FormatUpgrade`. The frontend asks `format_upgrade` before every open for
+editing and passes the user's answer as `upgrade`, which opens through
+`open_upgrading`. `BUNDLED_FORMAT` is the admin's own copy of the format
+trunkdb writes; a test checks a new database has it.
+
 Writes go one at a time per session. A session opened read-only refuses every
 write in `Session::write` with its own error category, and the frontend shows
 write actions only where `can_mutate` is true. Writes are never retried

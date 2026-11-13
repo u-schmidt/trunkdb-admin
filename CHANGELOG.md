@@ -35,6 +35,10 @@ Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.40.0.
   after a compaction counts what each index leaves out; and a compaction that
   frees no space still writes those counts. Exports end with a line counting
   what they hold, which an import checks.
+- **Asking before a format upgrade:** opening a file of an older format for
+  editing first says which format it has, which trunkdb last wrote it, and
+  that older trunkdb releases can't open it once it is upgraded, offering
+  Open read-only instead. Nothing upgrades a file without that answer.
 - **Filter rows:** `starts with`, `is one of` / `is none of` (trunkdb's `in`
   and `not in`), and `is of kind` / `is not of kind`; text with these turns
   into rows and back.

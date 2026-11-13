@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DraftGuardProvider, useDraftGuard } from "./DraftGuard";
+import { FormatUpgradeDialog } from "./FormatUpgradeDialog";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { StartScreen } from "../features/start/StartScreen";
 import { Workspace } from "../features/workspace/Workspace";
@@ -9,6 +10,7 @@ import { importedName } from "../features/tools/useDatabaseTools";
 import type {
   AppError,
   AppInfo,
+  FormatUpgrade,
   ImportSummary,
   Opened,
   RecentFile,
@@ -26,6 +28,14 @@ interface Failure {
    * the file isn't writable, and beside another program's writer.
    */
   editing?: boolean | undefined;
+}
+
+/** An open for editing waiting on the user's answer about the format. */
+interface Asking {
+  path: string;
+  upgrade: FormatUpgrade;
+  /** Open for editing from a read-only session of the same file. */
+  fromReadOnly: boolean;
 }
 
 /** A failed open or create, with the file it was about. */
@@ -53,6 +63,8 @@ function AppContent() {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [pending, setPending] = useState<Pending>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
+  // An open for editing that would raise the file's format, asked first.
+  const [asking, setAsking] = useState<Asking | null>(null);
   // The import the open database came from, said once above it.
   const [imported, setImported] = useState<ImportSummary | null>(null);
   // State updates are asynchronous; this is what actually keeps a second
@@ -116,11 +128,28 @@ function AppContent() {
     setRecent(opened.recent);
   };
 
-  const open = (path: string, readOnly: boolean) =>
-    enter(path, backend.databaseOpen(path, readOnly), !readOnly);
+  /**
+   * Opens `path`. For editing, a file of an older format is not opened but
+   * asked about first, unless `upgrade` is the answer already.
+   */
+  const open = async (path: string, readOnly: boolean, upgrade = false) => {
+    if (!readOnly && !upgrade) {
+      let needed: FormatUpgrade | null;
+      try {
+        needed = await backend.databaseFormatUpgrade(path);
+      } catch (thrown) {
+        throw new PathFailure(toAppError(thrown), path, true);
+      }
+      if (needed !== null) {
+        setAsking({ path, upgrade: needed, fromReadOnly: false });
+        return;
+      }
+    }
+    await enter(path, backend.databaseOpen(path, readOnly, upgrade), !readOnly);
+  };
 
-  const openPath = (path: string, readOnly: boolean) =>
-    exclusively("opening", () => open(path, readOnly));
+  const openPath = (path: string, readOnly: boolean, upgrade = false) =>
+    exclusively("opening", () => open(path, readOnly, upgrade));
 
   const openWithDialog = (readOnly: boolean) =>
     exclusively("opening", async () => {
@@ -151,7 +180,20 @@ function AppContent() {
    * failed open ends on the start screen, with the reason.
    */
   const switchMode = () => {
-    if (session !== null) leaveFor(session.path, session.can_mutate);
+    if (session === null) return;
+    if (session.can_mutate) {
+      leaveFor(session.path, true);
+      return;
+    }
+    // Asked while still open read-only, so Cancel stays there.
+    const current = session;
+    backend
+      .databaseFormatUpgrade(current.path)
+      .then((needed) => {
+        if (needed === null) leaveFor(current.path, false);
+        else setAsking({ path: current.path, upgrade: needed, fromReadOnly: true });
+      })
+      .catch((thrown: unknown) => setFailure({ error: toAppError(thrown) }));
   };
 
   /**
@@ -159,7 +201,7 @@ function AppContent() {
    * file the other way, or a new one an import made. A
    * failed open ends on the start screen, with the reason.
    */
-  const leaveFor = (path: string, readOnly: boolean) =>
+  const leaveFor = (path: string, readOnly: boolean, upgrade = false) =>
     guard.requestLeave(() => {
       if (session === null) return;
       const leaving = session;
@@ -171,7 +213,7 @@ function AppContent() {
         }
         setSession(null);
         setRecent(await backend.recentList());
-        await open(path, readOnly);
+        await open(path, readOnly, upgrade);
       });
     });
 
@@ -231,10 +273,32 @@ function AppContent() {
     </ErrorNotice>
   );
 
+  const upgradeDialog = asking !== null && (
+    <FormatUpgradeDialog
+      path={asking.path}
+      upgrade={asking.upgrade}
+      onUpgrade={() => {
+        setAsking(null);
+        if (asking.fromReadOnly) leaveFor(asking.path, false, true);
+        else void openPath(asking.path, false, true);
+      }}
+      onReadOnly={
+        asking.fromReadOnly
+          ? undefined
+          : () => {
+              setAsking(null);
+              void openPath(asking.path, true);
+            }
+      }
+      onCancel={() => setAsking(null)}
+    />
+  );
+
   if (session === null) {
     return (
       <div className="app" data-tauri-drag-region>
         {notice}
+        {upgradeDialog}
         <StartScreen
           appInfo={appInfo}
           recent={recent}
@@ -253,6 +317,7 @@ function AppContent() {
   return (
     <div className="app" data-tauri-drag-region>
       {notice}
+      {upgradeDialog}
       {imported !== null && imported.path === session.path && (
         <div className="notice notice-info" role="status">
           <p className="notice-message">

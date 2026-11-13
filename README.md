@@ -71,7 +71,9 @@ trunkdb is built into the app, pinned to the release tag `v0.40.0` in
 The app opens what that trunkdb opens: every file an earlier trunkdb wrote, in
 the current format 17. A file the app opens for editing is in that format
 afterwards, and trunkdb 0.39.0 or older, or TrunkDB Admin 0.1.0, can't open it
-then; a read-only open leaves the format as it is.
+then; a read-only open leaves the format as it is. So before an open for
+editing would change a file's format, the app asks, naming the format and the
+trunkdb that last wrote the file, and offers to open it read-only instead.
 
 ## Sharing a file with other programs
 

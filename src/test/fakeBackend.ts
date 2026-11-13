@@ -40,6 +40,7 @@ export function fakeBackend(overrides: Partial<Backend> = {}): Backend {
     pickDatabaseToOpen: vi.fn(async () => null),
     pickDatabaseToCreate: vi.fn(async () => null),
     databaseOpen: vi.fn(async (path: string, readOnly: boolean) => opened(path, readOnly)),
+    databaseFormatUpgrade: vi.fn(async () => null),
     databaseCreate: vi.fn(async (path: string) => opened(path)),
     sessionClose: vi.fn(async () => undefined),
     sessionOverview: vi.fn(async () => overviewOf()),

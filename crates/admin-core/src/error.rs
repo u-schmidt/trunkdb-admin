@@ -16,6 +16,9 @@ pub enum ErrorCategory {
     TargetNotFound,
     AlreadyExists,
     Locked,
+    /// An open for editing that would raise an older file format; asked
+    /// for with the upgrade, it opens.
+    FormatUpgrade,
     NotADatabase,
     UnsupportedFormat,
     PermissionDenied,

@@ -37,6 +37,7 @@ fn main() {
             commands::recent_list,
             commands::recent_remove,
             commands::database_open,
+            commands::database_format_upgrade,
             commands::database_create,
             commands::session_close,
             commands::session_overview,

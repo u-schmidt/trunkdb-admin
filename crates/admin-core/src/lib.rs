@@ -41,6 +41,8 @@ pub use query::{
     ResultRow, SortInput, ValueInput, ValueKind, ValueType,
 };
 pub use recent::{RecentFile, RecentFiles};
-pub use session::{FileInfo, Session, SessionInfo, SessionManager, TrunkdbBuild};
+pub use session::{
+    BUNDLED_FORMAT, FileInfo, FormatUpgrade, Session, SessionInfo, SessionManager, TrunkdbBuild,
+};
 pub use statement::{groups_statement, query_statement};
 pub use storage::{CollectionStorage, IndexStorage, PageUse, Recovery, StorageReport};

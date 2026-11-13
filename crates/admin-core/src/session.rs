@@ -26,6 +26,24 @@ impl TrunkdbBuild {
     };
 }
 
+/// The file format the bundled trunkdb writes, and stamps on a file it
+/// opens for writing. trunkdb has no public constant for it; a test
+/// checks that a new database has it, so a bump that changes it fails
+/// there first.
+pub const BUNDLED_FORMAT: u32 = 17;
+
+/// What opening a file for editing would change: its format, raised to
+/// the bundled one, after which older trunkdb releases can't open it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FormatUpgrade {
+    pub format_version: u32,
+    /// The trunkdb release that wrote the file last, where it says.
+    pub written_by: Option<String>,
+    pub becomes: u32,
+    /// The bundled trunkdb, which would write it.
+    pub bundled_release: &'static str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FileInfo {
     pub format_version: u32,
@@ -51,6 +69,16 @@ impl From<trunkdb::FileInfo> for FileInfo {
             written_by: info.written_by.map(|release| release.to_string()),
         }
     }
+}
+
+/// How a file is opened.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    ReadOnly,
+    /// For editing; `upgrade` lets trunkdb raise an older format.
+    Edit {
+        upgrade: bool,
+    },
 }
 
 /// What a successful open or create returns.
@@ -208,9 +236,51 @@ impl SessionManager {
 
     /// Opens a database that must already exist. trunkdb's own open would
     /// create a missing file and bootstrap an empty one, so both are
-    /// refused here first: opening never creates a database.
+    /// refused here first: opening never creates a database. A file of an
+    /// older format is refused with `FormatUpgrade` and left as it is:
+    /// trunkdb would raise its format, so that only `open_upgrading` does.
     pub fn open_existing(&self, path: &Path) -> AppResult<Arc<Session>> {
-        self.open(path, false)
+        self.open(path, Mode::Edit { upgrade: false })
+    }
+
+    /// Opens a database that must already exist for editing, raising an
+    /// older format to the bundled one, as trunkdb's writer does. Older
+    /// trunkdb releases can't open the file afterwards.
+    pub fn open_upgrading(&self, path: &Path) -> AppResult<Arc<Session>> {
+        self.open(path, Mode::Edit { upgrade: true })
+    }
+
+    /// What opening `path` for editing would change about its format;
+    /// `None` when nothing. Asked of the session that has the file open,
+    /// or else of a read-only open, which never writes (trunkdb SPEC §88).
+    pub fn format_upgrade(&self, path: &Path) -> AppResult<Option<FormatUpgrade>> {
+        let path = Self::existing_file(path)?;
+        let open = self
+            .lock()
+            .values()
+            .find(|session| session.path() == path)
+            .cloned();
+        let info = match open {
+            Some(session) => session.file_info()?,
+            None => FileInfo::from(Self::open_reading(&path)?.file_info()?),
+        };
+        Ok(Self::upgrade_of(&info))
+    }
+
+    fn upgrade_of(info: &FileInfo) -> Option<FormatUpgrade> {
+        (info.format_version < BUNDLED_FORMAT).then(|| FormatUpgrade {
+            format_version: info.format_version,
+            written_by: info.written_by.clone(),
+            becomes: BUNDLED_FORMAT,
+            bundled_release: TrunkdbBuild::CURRENT.version,
+        })
+    }
+
+    fn open_reading(path: &Path) -> AppResult<Database> {
+        Ok(Database::open_with(
+            path,
+            OpenOptions::default().read_only(true),
+        )?)
     }
 
     /// Opens a database that must already exist without writing to it or
@@ -220,10 +290,38 @@ impl SessionManager {
     /// write beside it (trunkdb SPEC §185): a read takes the readers' lock
     /// only while it runs.
     pub fn open_read_only(&self, path: &Path) -> AppResult<Arc<Session>> {
-        self.open(path, true)
+        self.open(path, Mode::ReadOnly)
     }
 
-    fn open(&self, path: &Path, read_only: bool) -> AppResult<Arc<Session>> {
+    fn open(&self, path: &Path, mode: Mode) -> AppResult<Arc<Session>> {
+        let path = Self::existing_file(path)?;
+        let read_only = mode == Mode::ReadOnly;
+        self.register(path, read_only, |path| {
+            if mode == (Mode::Edit { upgrade: false }) {
+                // Looked at read-only first: trunkdb's writer stamps the
+                // format as it opens.
+                let info = FileInfo::from(Self::open_reading(path)?.file_info()?);
+                if let Some(upgrade) = Self::upgrade_of(&info) {
+                    return Err(AppError::new(
+                        ErrorCategory::FormatUpgrade,
+                        format!(
+                            "Opening this file for editing would change its format from {} \
+                             to {}. Nothing was changed.",
+                            upgrade.format_version, upgrade.becomes
+                        ),
+                    ));
+                }
+            }
+            Ok(Database::open_with(
+                path,
+                OpenOptions::default().read_only(read_only),
+            )?)
+        })
+    }
+
+    /// The absolute path of a file that is there and isn't empty: what
+    /// can be opened without trunkdb creating a database.
+    fn existing_file(path: &Path) -> AppResult<PathBuf> {
         let path = Self::absolute(path)?;
         let metadata = std::fs::metadata(&path)
             .map_err(|error| AppError::from_io(&error, "The file cannot be opened."))?;
@@ -239,12 +337,7 @@ impl SessionManager {
                 "This file is empty, not a trunkdb database. Use Create to make a new one.",
             ));
         }
-        self.register(path, read_only, |path| {
-            Ok(Database::open_with(
-                path,
-                OpenOptions::default().read_only(read_only),
-            )?)
-        })
+        Ok(path)
     }
 
     /// Creates a new database and opens it. An existing target, of any

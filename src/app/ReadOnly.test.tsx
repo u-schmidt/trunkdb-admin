@@ -60,7 +60,7 @@ describe("opening read-only", () => {
     const backend = shopBackend();
     await openReadOnly(backend);
 
-    expect(backend.databaseOpen).toHaveBeenCalledWith(SHOP, true);
+    expect(backend.databaseOpen).toHaveBeenCalledWith(SHOP, true, false);
     expect(screen.getByRole("button", { name: "Open for editing" })).toBeEnabled();
     const file = screen.getByRole("region", { name: "File" });
     expect(file).toHaveTextContent("Nothing is written to the file or its write-ahead log");
@@ -78,7 +78,7 @@ describe("opening read-only", () => {
     await user.click(entry);
 
     await readOnlyHeading();
-    expect(backend.databaseOpen).toHaveBeenCalledWith(SHOP, true);
+    expect(backend.databaseOpen).toHaveBeenCalledWith(SHOP, true, false);
   });
 
   it("offers Open read-only when an open for editing is not permitted", async () => {
@@ -95,7 +95,7 @@ describe("opening read-only", () => {
     await user.click(within(alert).getByRole("button", { name: "Open read-only" }));
 
     await readOnlyHeading();
-    expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, true);
+    expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, true, false);
   });
 
   it("offers Open read-only when another program has the file open for writing", async () => {
@@ -112,7 +112,7 @@ describe("opening read-only", () => {
     await user.click(within(alert).getByRole("button", { name: "Open read-only" }));
 
     await readOnlyHeading();
-    expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, true);
+    expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, true, false);
   });
 
   it("offers nothing more when a read-only open is not permitted either", async () => {
@@ -190,7 +190,7 @@ describe("switching", () => {
 
     expect(await screen.findByRole("button", { name: "Reopen read-only" })).toBeVisible();
     expect(backend.sessionClose).toHaveBeenCalledWith("s1");
-    expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, false);
+    expect(backend.databaseOpen).toHaveBeenLastCalledWith(SHOP, false, false);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "shop.trunkdb" })).toBeVisible();
   });

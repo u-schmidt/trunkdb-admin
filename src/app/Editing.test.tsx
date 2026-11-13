@@ -483,7 +483,7 @@ describe("opening a database an import made", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "copy.trunkdb" })).toBeVisible();
     expect(backend.sessionClose).toHaveBeenCalled();
-    expect(backend.databaseOpen).toHaveBeenLastCalledWith("/data/copy.trunkdb", false);
+    expect(backend.databaseOpen).toHaveBeenLastCalledWith("/data/copy.trunkdb", false, false);
     expect(backend.documentSave).not.toHaveBeenCalled();
   });
 });

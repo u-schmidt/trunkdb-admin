@@ -8,9 +8,9 @@ use std::sync::Arc;
 use tauri::{AppHandle, State};
 use trunkdb_admin_core::{
     AppError, AppResult, CheckReport, CompactReport, ConditionInput, DocumentView, ExplainReport,
-    ExportSummary, FieldPaths, FieldPathsRequest, FilterRows, GroupRequest, GroupResult,
-    ImportSummary, IndexRequest, Overview, QueryRequest, QueryResult, RecentFile, RecentFiles,
-    SaveRequest, SavedDocument, Session, SessionInfo, StorageReport, TrunkdbBuild,
+    ExportSummary, FieldPaths, FieldPathsRequest, FilterRows, FormatUpgrade, GroupRequest,
+    GroupResult, ImportSummary, IndexRequest, Overview, QueryRequest, QueryResult, RecentFile,
+    RecentFiles, SaveRequest, SavedDocument, Session, SessionInfo, StorageReport, TrunkdbBuild,
 };
 
 /// Database and filesystem work blocks, so it never runs on the thread
@@ -74,23 +74,39 @@ impl Opened {
     }
 }
 
+/// Opens an existing database. For editing, a file of an older format is
+/// refused with `format_upgrade` unless `upgrade` allows raising it.
 #[tauri::command]
 pub async fn database_open(
     state: State<'_, AppState>,
     path: PathBuf,
     read_only: bool,
+    upgrade: bool,
 ) -> AppResult<Opened> {
     let sessions = Arc::clone(&state.sessions);
     let recents = Arc::clone(&state.recents);
     blocking(move || {
         let session = if read_only {
             sessions.open_read_only(&path)?
+        } else if upgrade {
+            sessions.open_upgrading(&path)?
         } else {
             sessions.open_existing(&path)?
         };
         Opened::new(&session, &recents)
     })
     .await
+}
+
+/// What opening `path` for editing would change about its file format;
+/// null when nothing. Writes nothing.
+#[tauri::command]
+pub async fn database_format_upgrade(
+    state: State<'_, AppState>,
+    path: PathBuf,
+) -> AppResult<Option<FormatUpgrade>> {
+    let sessions = Arc::clone(&state.sessions);
+    blocking(move || sessions.format_upgrade(&path)).await
 }
 
 #[tauri::command]

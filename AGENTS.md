@@ -46,6 +46,10 @@ databases. What the app does is in `README.md`, how it is built and why in
   trunkdb or to read database files directly.
 - Never hand a `trunkdb::Database` (or a clone) out of `Session::read`/`write`:
   closing relies on the session being the only owner to release the file lock.
+- An open for editing never raises a file format unasked: `open_existing`
+  refuses an older one with `format_upgrade`, and only `open_upgrading`, after
+  the user agreed in the dialog, raises it. A trunkdb bump that changes the
+  format updates `BUNDLED_FORMAT` (`session.rs`); a test fails until it does.
 - Every database command carries a `session_id`; nothing uses a global
   "current database".
 - Whether a session may write is `Session::can_mutate`, false for a read-only

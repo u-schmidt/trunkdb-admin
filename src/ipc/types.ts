@@ -8,6 +8,7 @@ export type ErrorCategory =
   | "target_not_found"
   | "already_exists"
   | "locked"
+  | "format_upgrade"
   | "not_a_database"
   | "unsupported_format"
   | "permission_denied"
@@ -46,6 +47,16 @@ export interface TrunkdbBuild {
 export interface AppInfo {
   app_version: string;
   trunkdb: TrunkdbBuild;
+}
+
+/** What opening a file for editing would change about its format. */
+export interface FormatUpgrade {
+  format_version: number;
+  /** The trunkdb release that wrote the file last, where it says. */
+  written_by: string | null;
+  becomes: number;
+  /** The bundled trunkdb, which would write it. */
+  bundled_release: string;
 }
 
 export interface FileInfo {

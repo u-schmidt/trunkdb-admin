@@ -13,6 +13,7 @@ import type {
   ExportSummary,
   FieldPaths,
   FieldPathsRequest,
+  FormatUpgrade,
   FilterRows,
   GroupRequest,
   GroupResult,
@@ -41,8 +42,13 @@ export interface Backend {
   pickDatabaseToOpen(): Promise<string | null>;
   /** Native dialog; null when the user cancels. */
   pickDatabaseToCreate(): Promise<string | null>;
-  /** `readOnly` writes nothing to the file or its WAL. */
-  databaseOpen(path: string, readOnly: boolean): Promise<Opened>;
+  /**
+   * `readOnly` writes nothing to the file or its WAL. For editing, a file
+   * of an older format is refused with `format_upgrade` unless `upgrade`.
+   */
+  databaseOpen(path: string, readOnly: boolean, upgrade?: boolean): Promise<Opened>;
+  /** What opening `path` for editing would change; null when nothing. */
+  databaseFormatUpgrade(path: string): Promise<FormatUpgrade | null>;
   databaseCreate(path: string): Promise<Opened>;
   /** Resolves once the file locks are released. */
   sessionClose(sessionId: string): Promise<void>;
@@ -135,7 +141,9 @@ export const tauriBackend: Backend = {
       defaultPath: "untitled.trunkdb",
       filters: DATABASE_FILTERS.slice(0, 1),
     }),
-  databaseOpen: (path, readOnly) => invoke("database_open", { path, readOnly }),
+  databaseOpen: (path, readOnly, upgrade = false) =>
+    invoke("database_open", { path, readOnly, upgrade }),
+  databaseFormatUpgrade: (path) => invoke("database_format_upgrade", { path }),
   databaseCreate: (path) => invoke("database_create", { path }),
   sessionClose: (sessionId) => invoke("session_close", { sessionId }),
   sessionOverview: (sessionId) => invoke("session_overview", { sessionId }),
