@@ -124,22 +124,22 @@ export interface Backend {
   quit(): Promise<void>;
 }
 
-const DATABASE_FILTERS = [
-  { name: "trunkdb database", extensions: ["trunkdb", "db"] },
-  { name: "All files", extensions: ["*"] },
-];
+// For naming a new database only. The open dialogs have no filter: trunkdb
+// needs no extension (apps use .trunkdb, .db, .trunk and others), and the
+// macOS open panel has no menu to switch filters, so an "All files" entry
+// would not let other files be chosen. The backend says what isn't a database.
+const DATABASE_FILTERS = [{ name: "trunkdb database", extensions: ["trunkdb", "db"] }];
 
 export const tauriBackend: Backend = {
   appInfo: () => invoke("app_info"),
   recentList: () => invoke("recent_list"),
   recentRemove: (path) => invoke("recent_remove", { path }),
-  pickDatabaseToOpen: () =>
-    open({ title: "Open database", multiple: false, directory: false, filters: DATABASE_FILTERS }),
+  pickDatabaseToOpen: () => open({ title: "Open database", multiple: false, directory: false }),
   pickDatabaseToCreate: () =>
     save({
       title: "Create database",
       defaultPath: "untitled.trunkdb",
-      filters: DATABASE_FILTERS.slice(0, 1),
+      filters: DATABASE_FILTERS,
     }),
   databaseOpen: (path, readOnly, upgrade = false) =>
     invoke("database_open", { path, readOnly, upgrade }),
@@ -189,16 +189,12 @@ export const tauriBackend: Backend = {
       title: "Import an export",
       multiple: false,
       directory: false,
-      filters: [
-        { name: "TrunkDB tagged JSON Lines", extensions: ["jsonl"] },
-        { name: "All files", extensions: ["*"] },
-      ],
     }),
   pickImportDestination: (suggestedName) =>
     save({
       title: "New database from the export",
       defaultPath: suggestedName,
-      filters: DATABASE_FILTERS.slice(0, 1),
+      filters: DATABASE_FILTERS,
     }),
   databaseImport: (source, destination) => invoke("database_import", { source, destination }),
   onQuitRequested: (handler) => {
