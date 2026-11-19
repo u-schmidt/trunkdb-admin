@@ -57,8 +57,16 @@ export interface CollectionQuery {
  * Runs a collection's queries in the backend and keeps only the answer to
  * the newest request: each one carries an ID, and a response with an older
  * ID is dropped instead of overwriting the view.
+ *
+ * With `live`, the list is read again whenever the backend reports that
+ * the documents it shows changed: a read-only session beside another
+ * program's writes. The watch follows the applied filter.
  */
-export function useCollectionQuery(sessionId: string, collection: string): CollectionQuery {
+export function useCollectionQuery(
+  sessionId: string,
+  collection: string,
+  live = false,
+): CollectionQuery {
   const backend = useBackend();
   const [result, setResult] = useState<QueryResult | null>(null);
   const [applied, setApplied] = useState<Criteria>(DEFAULT_CRITERIA);
@@ -122,6 +130,19 @@ export function useCollectionQuery(sessionId: string, collection: string): Colle
     };
   }, [send]);
 
+  // The watch is replaced whenever the applied filter changes. Calls go
+  // out one after another, so an older filter's watch can't land last.
+  const watched = JSON.stringify(applied.filter);
+  const watchQueue = useRef<Promise<unknown>>(Promise.resolve());
+  useEffect(() => {
+    if (!live) return;
+    const filter = JSON.parse(watched) as FilterInput;
+    watchQueue.current = watchQueue.current
+      .then(() => backend.collectionWatch(sessionId, collection, filter))
+      // A filter the query refused is shown by the query; nothing to watch.
+      .catch(() => undefined);
+  }, [backend, sessionId, collection, live, watched]);
+
   const apply = useCallback((criteria: Criteria) => run(criteria, 0), [run]);
   const goToPage = useCallback((page: number) => run(position.current.criteria, page), [run]);
   const refresh = useCallback(() => run(position.current.criteria, position.current.page), [run]);
@@ -135,6 +156,29 @@ export function useCollectionQuery(sessionId: string, collection: string): Colle
     (hint: HintInput | null) => run({ ...position.current.criteria, hint }, position.current.page),
     [run],
   );
+
+  // The refresh a change asks for. Read through a ref, so subscribing once
+  // doesn't depend on when `refresh` is made again.
+  const refreshRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
+  useEffect(() => {
+    if (!live) return;
+    const stop = backend.onListChanged((change) => {
+      if (change.session_id === sessionId && change.collection === collection) {
+        refreshRef.current();
+      }
+    });
+    return () => {
+      stop();
+      // The session's watch goes with the view. Queued after any watch call
+      // still under way, so it can't be replaced by one.
+      void watchQueue.current
+        .then(() => backend.collectionUnwatch(sessionId))
+        .catch(() => undefined);
+    };
+  }, [backend, sessionId, collection, live]);
 
   return { result, applied, requested, loading, error, apply, goToPage, choose, setHint, refresh };
 }

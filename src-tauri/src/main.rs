@@ -44,6 +44,8 @@ fn main() {
             commands::collection_prepare,
             commands::collection_discard_virtual,
             commands::collection_query,
+            commands::collection_watch,
+            commands::collection_unwatch,
             commands::collection_explain,
             commands::collection_find_command,
             commands::collection_field_paths,

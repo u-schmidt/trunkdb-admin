@@ -464,6 +464,9 @@ export function demoBackend(): Backend {
     onQuitRequested: () => () => undefined,
     setUnsavedDraft: async () => undefined,
     quit: async () => undefined,
+    collectionWatch: async () => undefined,
+    collectionUnwatch: async () => undefined,
+    onListChanged: () => () => undefined,
     collectionQuery: (_session, request: QueryRequest) => {
       let conditions: ConditionInput[];
       try {

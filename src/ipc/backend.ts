@@ -13,12 +13,14 @@ import type {
   ExportSummary,
   FieldPaths,
   FieldPathsRequest,
+  FilterInput,
   FormatUpgrade,
   FilterRows,
   GroupRequest,
   GroupResult,
   ImportSummary,
   IndexRequest,
+  ListChanged,
   Opened,
   Overview,
   QueryRequest,
@@ -56,6 +58,14 @@ export interface Backend {
   collectionPrepare(sessionId: string, name: string): Promise<Overview>;
   collectionDiscardVirtual(sessionId: string, name: string): Promise<Overview>;
   collectionQuery(sessionId: string, request: QueryRequest): Promise<QueryResult>;
+  /**
+   * Watches the documents a list with `filter` shows, in a read-only session;
+   * replaces the session's earlier watch. Its changes come as `onListChanged`.
+   */
+  collectionWatch(sessionId: string, collection: string, filter: FilterInput): Promise<void>;
+  collectionUnwatch(sessionId: string): Promise<void>;
+  /** Calls `handler` for each burst of changes to a watched list; returns how to stop. */
+  onListChanged(handler: (change: ListChanged) => void): () => void;
   /** Every field path of a collection's documents, counted; reads them all. */
   collectionFieldPaths(sessionId: string, request: FieldPathsRequest): Promise<FieldPaths>;
   /** The list's query as a `trunkdb find` command. */
@@ -151,6 +161,13 @@ export const tauriBackend: Backend = {
   collectionDiscardVirtual: (sessionId, name) =>
     invoke("collection_discard_virtual", { sessionId, name }),
   collectionQuery: (sessionId, request) => invoke("collection_query", { sessionId, request }),
+  collectionWatch: (sessionId, collection, filter) =>
+    invoke("collection_watch", { sessionId, collection, filter }),
+  collectionUnwatch: (sessionId) => invoke("collection_unwatch", { sessionId }),
+  onListChanged: (handler) => {
+    const stop = listen<ListChanged>("collection-changed", (event) => handler(event.payload));
+    return () => void stop.then((unlisten) => unlisten());
+  },
   collectionExplain: (sessionId, request) => invoke("collection_explain", { sessionId, request }),
   collectionFieldPaths: (sessionId, request) =>
     invoke("collection_field_paths", { sessionId, request }),

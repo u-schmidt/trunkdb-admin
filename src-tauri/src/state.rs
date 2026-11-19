@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use trunkdb_admin_core::{Preferences, RecentFiles, SessionManager};
+use std::sync::{Arc, Mutex};
+use trunkdb_admin_core::{ListWatcher, Preferences, RecentFiles, SessionManager};
 
 /// The services shared by all commands. `Arc`s, because each command
 /// moves its work onto a blocking thread.
@@ -12,6 +13,9 @@ pub struct AppState {
     /// Whether the frontend has a modified document draft; read when macOS
     /// asks whether the app may terminate (`terminate.rs`).
     unsaved_draft: AtomicBool,
+    /// The list watch of each session that has one. Dropping a watcher
+    /// stops it, so closing a session removes its entry.
+    watchers: Arc<Mutex<HashMap<String, ListWatcher>>>,
 }
 
 impl AppState {
@@ -22,7 +26,13 @@ impl AppState {
             recents: Arc::new(RecentFiles::new(state_dir.join("recent-files.json"))),
             preferences: Preferences::new(state_dir.join("preferences.json")),
             unsaved_draft: AtomicBool::new(false),
+            watchers: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// The shared watcher map, for the commands that start and stop watches.
+    pub fn watchers_handle(&self) -> Arc<Mutex<HashMap<String, ListWatcher>>> {
+        Arc::clone(&self.watchers)
     }
 
     pub fn has_unsaved_draft(&self) -> bool {

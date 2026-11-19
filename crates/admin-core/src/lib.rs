@@ -47,4 +47,4 @@ pub use session::{
 };
 pub use statement::{groups_statement, query_statement};
 pub use storage::{CollectionStorage, IndexStorage, PageUse, Recovery, StorageReport};
-pub use watch::{ListWatch, Wait};
+pub use watch::{ListWatch, ListWatcher, Wait};

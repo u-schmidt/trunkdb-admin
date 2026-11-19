@@ -64,7 +64,8 @@ interface Props {
 export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOverview }: Props) {
   const backend = useBackend();
   const guard = useDraftGuard();
-  const query = useCollectionQuery(sessionId, collection.name);
+  // Read-only: another program's writes reach the list while it is open here.
+  const query = useCollectionQuery(sessionId, collection.name, !canMutate);
   const { result, applied, requested, loading, error } = query;
   const [view, setView] = useState<View>("json");
   const [dismissed, setDismissed] = useState<object | null>(null);
