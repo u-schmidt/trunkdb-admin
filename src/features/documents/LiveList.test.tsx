@@ -91,18 +91,20 @@ describe("a read-only list that other programs write beside", () => {
   });
 });
 
-describe("the Live line under the list", () => {
-  it("says when the list last changed", async () => {
+describe("the list's live state in the status bar", () => {
+  const statusBar = () => screen.getByRole("contentinfo");
+
+  it("says Live, and when the list last changed", async () => {
     const backend = tasksBackend();
     await openTasks(backend, true);
-    expect(screen.getByText(/Live: other programs/)).toBeInTheDocument();
+    expect(within(statusBar()).getByText(/^Live$/)).toBeInTheDocument();
 
     listener(backend)({ session_id: "s1", collection: "tasks" });
 
-    expect(await screen.findByText(/updated \d/)).toBeInTheDocument();
+    expect(await within(statusBar()).findByText(/^Live · updated \d/)).toBeInTheDocument();
   });
 
-  it("turns the watch off and on with its button", async () => {
+  it("turns the watch off and on with the toolbar button", async () => {
     const stop = vi.fn();
     const backend = tasksBackend({ onListChanged: vi.fn(() => stop) });
     await openTasks(backend, true);
@@ -112,7 +114,7 @@ describe("the Live line under the list", () => {
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("Live updates are off")).toBeInTheDocument();
+    expect(within(statusBar()).getByText("Live off")).toBeInTheDocument();
     expect(backend.collectionUnwatch).toHaveBeenCalledWith("s1");
     expect(stop).toHaveBeenCalled();
 
@@ -122,12 +124,12 @@ describe("the Live line under the list", () => {
     await waitFor(() => expect(backend.collectionWatch).toHaveBeenCalledTimes(2));
   });
 
-  it("says an editing session is not live, with no toggle", async () => {
+  it("has no live state for an editing session, and no toggle", async () => {
     const backend = tasksBackend();
     await openTasks(backend, false);
 
-    expect(screen.getByText(/Not live: the file is open for editing/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Live updates" })).toBeNull();
+    expect(within(statusBar()).queryByText(/Live/)).toBeNull();
   });
 
   it("says the groups are not live", async () => {
@@ -136,6 +138,7 @@ describe("the Live line under the list", () => {
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Groups" }));
 
-    expect(await screen.findByText(/Groups are not live/)).toBeInTheDocument();
+    expect(await within(statusBar()).findByText("Groups not live")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Live updates" })).toBeNull();
   });
 });

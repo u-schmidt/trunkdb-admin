@@ -1908,22 +1908,8 @@ button.danger-quiet {
   border-bottom: 1px solid var(--border);
 }
 
-.live-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0.25rem 0;
-  font-size: 0.9em;
-}
-
-.live-state {
+.status-live {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-}
-
-.live-state svg {
-  color: var(--accent);
 }

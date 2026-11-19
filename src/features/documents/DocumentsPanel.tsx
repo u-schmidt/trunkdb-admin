@@ -7,6 +7,7 @@ import {
   PanelRight,
   PanelRightClose,
   Plus,
+  Radio,
   RefreshCw,
   Route,
   Table2,
@@ -35,7 +36,6 @@ import { isEmptyFilter, sameFilter } from "./filter";
 import { FilterBuilder, type FilterDraft, type FilterMistake } from "./FilterBuilder";
 import { GroupsView } from "./GroupsView";
 import { JsonResults } from "./JsonResults";
-import { LiveLine } from "./LiveLine";
 import { Pager } from "./Pager";
 import { TableResults } from "./TableResults";
 import { useCollectionQuery } from "./useCollectionQuery";
@@ -53,6 +53,39 @@ const SIDE_PAGES: SidePage[] = ["document", "explain", "statement"];
 const PANE_MIN = 288;
 const LIST_MIN = 480;
 
+/**
+ * What the list does about other programs' changes: follows them, is
+ * turned off, shows groups (made anew, never live), or is open for editing
+ * (nothing else writes to it).
+ */
+export type ListState = "live" | "off" | "groups" | "editing";
+
+/** The status bar's text and its explanation for a list's state; null for none. */
+export function liveStatus(
+  state: ListState,
+  changedAt: Date | null,
+): { text: string; title: string } | null {
+  switch (state) {
+    case "live":
+      return {
+        text: changedAt === null ? "Live" : `Live · updated ${changedAt.toLocaleTimeString("en")}`,
+        title: "Other programs' changes appear in this list as they happen.",
+      };
+    case "off":
+      return {
+        text: "Live off",
+        title: "Live updates are off for this list. Turn them on in the list's toolbar.",
+      };
+    case "groups":
+      return {
+        text: "Groups not live",
+        title: "Groups are made again from the filter each time they are shown.",
+      };
+    case "editing":
+      return null;
+  }
+}
+
 interface Props {
   sessionId: string;
   collection: CollectionSummary;
@@ -60,9 +93,17 @@ interface Props {
   canMutate: boolean;
   /** Counts in the sidebar may be as old as the list; refresh both. */
   onRefreshOverview: () => void;
+  /** What the list does about changes, for the status bar; null when unmounted. */
+  onListState?: (state: ListState | null, changedAt: Date | null) => void;
 }
 
-export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOverview }: Props) {
+export function DocumentsPanel({
+  sessionId,
+  collection,
+  canMutate,
+  onRefreshOverview,
+  onListState,
+}: Props) {
   const backend = useBackend();
   const guard = useDraftGuard();
   const [view, setView] = useState<View>("json");
@@ -93,6 +134,11 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
   };
   const groups = useGroups(sessionId, collection.name);
   const grouped = view === "groups";
+  const listState: ListState = canMutate ? "editing" : grouped ? "groups" : liveOn ? "live" : "off";
+  useEffect(() => {
+    onListState?.(listState, query.changedAt);
+  }, [listState, query.changedAt, onListState]);
+  useEffect(() => () => onListState?.(null, null), [onListState]);
 
   // Groups count what the list's filter finds: shown again after the
   // filter changed in another view, they are made again from it. Not
@@ -385,6 +431,17 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
                   : "Columns…"}
             </button>
           )}
+          {!canMutate && !grouped && (
+            <button
+              type="button"
+              aria-pressed={liveOn}
+              title="Show other programs' changes in this list as they happen"
+              onClick={() => setLiveOn((current) => !current)}
+            >
+              <Radio aria-hidden="true" />
+              Live updates
+            </button>
+          )}
           {canMutate && (
             <button type="button" onClick={newDocument}>
               <Plus aria-hidden="true" />
@@ -458,13 +515,6 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             onPageSize={(pageSize) => query.apply({ ...requested, pageSize })}
           />
         )}
-        <LiveLine
-          canMutate={canMutate}
-          grouped={grouped}
-          on={liveOn}
-          changedAt={query.changedAt}
-          onToggle={() => setLiveOn((current) => !current)}
-        />
       </div>
       {/* Hidden rather than unmounted: an unsaved document survives a
           hidden pane, as it does another tab in front. */}
