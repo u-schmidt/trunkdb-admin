@@ -100,6 +100,8 @@ function printRows(rows: ConditionInput[]): string {
       if (row.operator === "missing") return `not exists(${row.field})`;
       if (row.operator === "is_kind") return `${row.field} is ${row.kind ?? "string"}`;
       if (row.operator === "is_not_kind") return `${row.field} is not ${row.kind ?? "string"}`;
+      if (row.operator === "older_than") return `${row.field} < now - ${row.age ?? ""}`;
+      if (row.operator === "newer_than") return `${row.field} >= now - ${row.age ?? ""}`;
       if (row.operator === "in" || row.operator === "not_in") {
         const list = (row.values ?? []).map(showValue).join(", ");
         return `${row.field} ${row.operator === "in" ? "in" : "not in"} (${list})`;
@@ -197,6 +199,16 @@ function matches(row: ResultRow, condition: ConditionInput): boolean {
       return kindOf(condition.kind);
     case "is_not_kind":
       return !kindOf(condition.kind);
+    case "older_than":
+    case "newer_than": {
+      // Rough, as the rest: the preview read as a date against this moment.
+      const at = Date.parse(preview ?? "");
+      const age = /^(\d+)(d|h|m|s|ms)$/.exec(condition.age ?? "");
+      if (Number.isNaN(at) || age === null) return false;
+      const unit = { d: 864e5, h: 36e5, m: 6e4, s: 1e3, ms: 1 }[age[2] as "d"];
+      const before = Date.now() - Number(age[1]) * unit;
+      return condition.operator === "older_than" ? at < before : at >= before;
+    }
     default:
       return preview === text;
   }
@@ -251,7 +263,7 @@ export function demoBackend(): Backend {
     pages: 214,
     free_pages: 18,
     created_by: "0.24.0",
-    written_by: "0.40.0",
+    written_by: "0.43.0",
   };
   // The archived file is still as trunkdb 0.24.0 left it, until it is
   // opened for editing with the upgrade.
@@ -282,7 +294,7 @@ export function demoBackend(): Backend {
   return {
     appInfo: async () => ({
       app_version: "0.1.0",
-      trunkdb: { version: "0.40.0", revision: "f4ae88cc506a604d5d205701d8b6ec77a302e285" },
+      trunkdb: { version: "0.43.0", revision: "048ca37ab374cba5397c14fa252400fccb6568f9" },
     }),
     recentList: async () => recents(),
     recentRemove: async (path) => recents().filter((entry) => entry.path !== path),
@@ -317,7 +329,7 @@ export function demoBackend(): Backend {
     },
     databaseFormatUpgrade: async (path) =>
       path === ARCHIVE && !archiveUpgraded
-        ? { format_version: 12, written_by: "0.24.0", becomes: 17, bundled_release: "0.40.0" }
+        ? { format_version: 12, written_by: "0.24.0", becomes: 17, bundled_release: "0.43.0" }
         : null,
     databaseCreate: async (path) => ({ session: sessionInfo(path), recent: [recentFile(path)] }),
     sessionClose: async () => undefined,

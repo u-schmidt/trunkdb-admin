@@ -43,6 +43,8 @@ const OPERATOR_LABELS: Record<Operator, string> = {
   missing: "is missing",
   is_kind: "is of kind",
   is_not_kind: "is not of kind",
+  older_than: "is older than (ago)",
+  newer_than: "is newer than (ago)",
 };
 
 const KIND_LABELS: Record<Kind, string> = {
@@ -85,6 +87,8 @@ interface Row {
   /** The values of `in` and `not_in`, all of `type`. */
   values: string[];
   kind: Kind;
+  /** The age of `older_than` and `newer_than`, such as 10m. */
+  age: string;
 }
 
 export interface FilterDraft {
@@ -122,7 +126,7 @@ interface Props {
   sortable?: boolean;
 }
 
-type Shape = "value" | "values" | "kind" | "none";
+type Shape = "value" | "values" | "kind" | "age" | "none";
 
 /** What an operator takes besides the field. */
 function shapeOf(operator: Operator): Shape {
@@ -136,6 +140,9 @@ function shapeOf(operator: Operator): Shape {
     case "is_kind":
     case "is_not_kind":
       return "kind";
+    case "older_than":
+    case "newer_than":
+      return "age";
     default:
       return "value";
   }
@@ -170,6 +177,8 @@ function toCondition(row: Row): ConditionInput {
       return base;
     case "kind":
       return { ...base, kind: row.kind };
+    case "age":
+      return { ...base, age: row.age.trim() };
     case "values":
       return { ...base, values: row.values.map((text) => ({ type, text: valueText(type, text) })) };
     case "value":
@@ -186,6 +195,7 @@ function rowsOf(conditions: ConditionInput[], firstKey: number): Row[] {
     text: condition.value?.text ?? "",
     values: condition.values?.map((value) => value.text) ?? [""],
     kind: condition.kind ?? "string",
+    age: condition.age ?? "",
   }));
 }
 
@@ -374,6 +384,7 @@ export function FilterBuilder({
         text: "",
         values: [""],
         kind: "string",
+        age: "",
       },
     ]);
     setNextKey((key) => key + 1);
@@ -564,6 +575,20 @@ export function FilterBuilder({
                       </button>
                     </span>
                   </>
+                )}
+                {shape === "age" && (
+                  <input
+                    type="text"
+                    className="filter-value"
+                    aria-label={`Condition ${n} age`}
+                    placeholder="10m"
+                    title="A whole number and a unit: d, h, m, s, ms, us or ns"
+                    value={row.age}
+                    onChange={(event) => change(row.key, { age: event.target.value })}
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                  />
                 )}
                 {shape === "kind" && (
                   <Select

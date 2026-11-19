@@ -32,6 +32,12 @@ pub enum Operator {
     IsKind,
     /// The field holds no value of `kind`: also where it is missing or null.
     IsNotKind,
+    /// A date-time more than `age` before the time of the read: `field <
+    /// now - age` (trunkdb SPEC §203). `age` is in the condition's `age`.
+    OlderThan,
+    /// A date-time at most `age` before the time of the read, or after
+    /// it: `field >= now - age`.
+    NewerThan,
 }
 
 /// A kind of value for `is_kind`, as trunkdb's filter text names it.
@@ -121,6 +127,61 @@ pub struct ConditionInput {
     /// The kind of `is_kind` and `is_not_kind`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<KindInput>,
+    /// The age of `older_than` and `newer_than`, as `10m` or `36h`: a
+    /// whole number and one unit of `d`, `h`, `m`, `s`, `ms`, `us` or
+    /// `ns`, as trunkdb's filter text writes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age: Option<String>,
+}
+
+/// The units an age is written in, longest first, with their length in
+/// nanoseconds: trunkdb's own (SPEC §203).
+const AGE_UNITS: [(&str, u128); 7] = [
+    ("d", 86_400_000_000_000),
+    ("h", 3_600_000_000_000),
+    ("m", 60_000_000_000),
+    ("s", 1_000_000_000),
+    ("ms", 1_000_000),
+    ("us", 1_000),
+    ("ns", 1),
+];
+
+/// An age such as `10m`, as a duration. A whole number and one unit;
+/// the first mistake otherwise.
+pub(crate) fn parse_age(text: &str) -> Result<std::time::Duration, String> {
+    let text = text.trim();
+    let example = "an age such as 10m (units d, h, m, s, ms, us, ns)";
+    if text.is_empty() {
+        return Err(format!("enter {example}."));
+    }
+    let digits = text.chars().take_while(char::is_ascii_digit).count();
+    let (number, unit) = text.split_at(digits);
+    let Some(&(_, length)) = AGE_UNITS.iter().find(|(name, _)| *name == unit) else {
+        return Err(format!("\u{201c}{text}\u{201d} is not {example}."));
+    };
+    let count: u128 = number
+        .parse()
+        .map_err(|_| format!("\u{201c}{text}\u{201d} is not {example}."))?;
+    let nanos = count
+        .checked_mul(length)
+        .filter(|nanos| nanos / 1_000_000_000 <= u64::MAX as u128)
+        .ok_or_else(|| "that age is too long.".to_string())?;
+    Ok(std::time::Duration::new(
+        (nanos / 1_000_000_000) as u64,
+        (nanos % 1_000_000_000) as u32,
+    ))
+}
+
+/// An age as trunkdb's filter text writes it: the longest unit that
+/// makes it whole. Reads back with `parse_age` to the same duration.
+pub(crate) fn format_age(age: std::time::Duration) -> String {
+    let nanos = age.as_nanos();
+    let (name, length) = AGE_UNITS
+        .iter()
+        .copied()
+        .find(|(_, length)| nanos.is_multiple_of(*length))
+        .unwrap_or(("ns", 1));
+    format!("{}{name}", nanos / length)
 }
 
 /// The list's filter: rows of typed conditions, all to hold, or a
@@ -413,6 +474,13 @@ impl ConditionInput {
         let op = match self.operator {
             Operator::Exists => return Ok(Condition::exists(field)),
             Operator::Missing => return Ok(Condition::missing(field)),
+            Operator::OlderThan | Operator::NewerThan => {
+                let age = parse_age(self.age.as_deref().unwrap_or(""))?;
+                return Ok(match self.operator {
+                    Operator::OlderThan => Condition::older_than(field, age),
+                    _ => Condition::newer_than(field, age),
+                });
+            }
             Operator::IsKind | Operator::IsNotKind => {
                 let kind = self.kind.ok_or("choose a kind of value.")?.kind();
                 let condition = Condition::is_kind(field, kind);
@@ -685,6 +753,43 @@ impl Cell {
         match text.char_indices().nth(Self::PREVIEW_CHARS) {
             Some((end, _)) => format!("{}\u{2026}", &text[..end]),
             None => text,
+        }
+    }
+}
+
+#[cfg(test)]
+mod age_tests {
+    use super::{format_age, parse_age};
+    use std::time::Duration;
+
+    #[test]
+    fn an_age_reads_in_one_unit_and_prints_in_the_longest_whole_one() {
+        assert_eq!(parse_age("10m"), Ok(Duration::from_secs(600)));
+        assert_eq!(parse_age(" 36h "), Ok(Duration::from_secs(36 * 3600)));
+        assert_eq!(parse_age("1500ms"), Ok(Duration::from_millis(1500)));
+        assert_eq!(parse_age("0s"), Ok(Duration::ZERO));
+        assert_eq!(format_age(Duration::from_secs(5400)), "90m");
+        assert_eq!(format_age(Duration::from_millis(1500)), "1500ms");
+        assert_eq!(format_age(Duration::ZERO), "0d");
+        assert_eq!(format_age(Duration::new(1, 1)), "1000000001ns");
+        for age in ["7d", "23h", "59m", "1ns", "123456789us"] {
+            assert_eq!(format_age(parse_age(age).unwrap()), age);
+        }
+    }
+
+    #[test]
+    fn a_mistake_in_an_age_is_refused() {
+        for age in [
+            "",
+            "m",
+            "10",
+            "10 m",
+            "-5m",
+            "2.5h",
+            "3w",
+            "99999999999999999999d",
+        ] {
+            assert!(parse_age(age).is_err(), "{age} should be refused");
         }
     }
 }

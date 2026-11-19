@@ -131,6 +131,8 @@ export const OPERATORS = [
   "missing",
   "is_kind",
   "is_not_kind",
+  "older_than",
+  "newer_than",
 ] as const;
 export type Operator = (typeof OPERATORS)[number];
 
@@ -167,6 +169,8 @@ export interface ConditionInput {
   values?: ValueInput[];
   /** The kind of is_kind and is_not_kind; absent otherwise. */
   kind?: Kind;
+  /** The age of older_than and newer_than, such as 10m; absent otherwise. */
+  age?: string;
 }
 
 /**

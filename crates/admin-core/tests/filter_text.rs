@@ -457,3 +457,82 @@ fn the_command_carries_the_hint() {
     let command = fx.session.find_command(&asked).unwrap();
     assert!(command.ends_with("'n > 1 use index (n, f)'"), "{command}");
 }
+
+/// A row comparing a field with the clock: `older_than` or `newer_than`.
+fn aged(field: &str, operator: Operator, age: &str) -> ConditionInput {
+    ConditionInput {
+        field: field.to_string(),
+        operator,
+        age: Some(age.to_string()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn an_age_row_finds_what_its_text_finds_and_the_text_turns_back_into_it() {
+    let fx = things();
+    // The dated documents are from March 2026: older than an hour
+    // whenever this runs, and never newer.
+    let older = fx
+        .session
+        .query(&request(
+            "things",
+            FilterInput::Rows(vec![aged("at", Operator::OlderThan, "1h")]),
+        ))
+        .unwrap();
+    let older_text = fx
+        .session
+        .query(&request("things", text("at < now - 1h")))
+        .unwrap();
+    assert_eq!(older.total, 2);
+    assert_eq!(ids(&older), ids(&older_text));
+
+    let newer = fx
+        .session
+        .query(&request(
+            "things",
+            FilterInput::Rows(vec![aged("at", Operator::NewerThan, "90m")]),
+        ))
+        .unwrap();
+    assert_eq!(newer.total, 0);
+
+    // Printed as trunkdb's text, and read back as the same rows.
+    let both = vec![
+        aged("at", Operator::OlderThan, "1h"),
+        aged("at", Operator::NewerThan, "90m"),
+    ];
+    assert_eq!(
+        filter_to_text(&both).unwrap(),
+        "at < now - 1h and at >= now - 90m"
+    );
+    assert_eq!(
+        filter_to_rows("at < now - 1h and at >= now - 90m"),
+        FilterRows::Rows(both)
+    );
+}
+
+#[test]
+fn a_clock_comparison_rows_cant_hold_is_said_so() {
+    // `= now` is no text at all: trunkdb refuses it before rows are asked.
+    for filter in ["at < now + 1h", "at <= now - 1h", "at > now - 1h"] {
+        let FilterRows::Reason(reason) = filter_to_rows(filter) else {
+            panic!("{filter} should not read as rows");
+        };
+        assert!(reason.contains("rows can't show"), "{reason}");
+    }
+}
+
+#[test]
+fn an_age_that_is_not_a_duration_is_the_first_mistake() {
+    let fx = things();
+    for age in ["", "10 minutes", "10", "m", "1.5h", "3w"] {
+        let error = fx
+            .session
+            .query(&request(
+                "things",
+                FilterInput::Rows(vec![aged("at", Operator::OlderThan, age)]),
+            ))
+            .unwrap_err();
+        assert_eq!(error.category, ErrorCategory::InvalidInput, "{age}");
+    }
+}

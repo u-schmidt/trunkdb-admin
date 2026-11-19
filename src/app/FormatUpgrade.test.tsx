@@ -15,7 +15,7 @@ const UPGRADE: FormatUpgrade = {
   format_version: 12,
   written_by: "0.24.0",
   becomes: 17,
-  bundled_release: "0.40.0",
+  bundled_release: "0.43.0",
 };
 
 function oldFileBackend(overrides: Partial<Backend> = {}) {
@@ -51,7 +51,7 @@ describe("opening an older file for editing", () => {
 
     expect(dialog).toHaveTextContent(
       "notes.trunkdb has file format 12, last written by trunkdb 0.24.0. " +
-        "Opening it for editing changes it to format 17, the format of the bundled trunkdb 0.40.0.",
+        "Opening it for editing changes it to format 17, the format of the bundled trunkdb 0.43.0.",
     );
     expect(dialog).toHaveTextContent("such as 0.24.0, can't open the file afterwards");
     expect(backend.databaseFormatUpgrade).toHaveBeenCalledWith(OLD);

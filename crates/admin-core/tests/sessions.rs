@@ -26,10 +26,10 @@ fn entries(dir: &TempDir) -> Vec<String> {
 
 #[test]
 fn the_bundled_trunkdb_is_the_pinned_one() {
-    assert_eq!(TrunkdbBuild::CURRENT.version, "0.40.0");
+    assert_eq!(TrunkdbBuild::CURRENT.version, "0.43.0");
     assert_eq!(
         TrunkdbBuild::CURRENT.revision,
-        "f4ae88cc506a604d5d205701d8b6ec77a302e285"
+        "048ca37ab374cba5397c14fa252400fccb6568f9"
     );
 }
 

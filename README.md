@@ -18,7 +18,8 @@ made and tested on.
 - **Browse** a collection as JSON or as a table, sorted and paged by trunkdb,
   with the columns you choose, or every field but the ones you hide.
 - **Filter** with typed rows (comparisons, contains, starts with, one of a list
-  of values, a kind of value) or with trunkdb's filter language as text
+  of values, a kind of value, a date-time older or newer than an age such as
+  10m) or with trunkdb's filter language as text
   (`status = "open" and due < date("2026-12-01T00:00:00Z")`); copy the list as a
   `trunkdb find` command.
 - **Groups:** documents counted per value of up to three fields, with sums,
@@ -66,7 +67,7 @@ without a database: enough to look at the layout.
 
 ## Bundled trunkdb
 
-trunkdb is built into the app, pinned to the release tag `v0.40.0` in
+trunkdb is built into the app, pinned to the release tag `v0.43.0` in
 `Cargo.toml`; the start screen and the overview show the version and commit.
 The app opens what that trunkdb opens: every file an earlier trunkdb wrote, in
 the current format 17. A file the app opens for editing is in that format
