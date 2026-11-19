@@ -52,6 +52,10 @@ databases. What the app does is in `README.md`, how it is built and why in
   format updates `BUNDLED_FORMAT` (`session.rs`); a test fails until it does.
 - Every database command carries a `session_id`; nothing uses a global
   "current database".
+- A list watch belongs to the shell: one per session in `AppState.watchers`,
+  dropped when the session closes. The frontend sends watch calls per session
+  in order (`queueWatch`), and `collection_unwatch` names its collection, so a
+  late stop can't remove a newer watch.
 - Whether a session may write is `Session::can_mutate`, false for a read-only
   open. Every write goes through `Session::write`, which refuses
   then with the `read_only` category; a new write action is shown only when

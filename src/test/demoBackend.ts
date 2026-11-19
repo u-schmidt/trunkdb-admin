@@ -293,7 +293,7 @@ export function demoBackend(): Backend {
   const later = <T>(value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(value), 80));
   return {
     appInfo: async () => ({
-      app_version: "0.1.0",
+      app_version: "0.2.0",
       trunkdb: { version: "0.43.0", revision: "048ca37ab374cba5397c14fa252400fccb6568f9" },
     }),
     recentList: async () => recents(),

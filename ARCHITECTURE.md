@@ -63,6 +63,22 @@ write in `Session::write` with its own error category, and the frontend shows
 write actions only where `can_mutate` is true. Writes are never retried
 automatically.
 
+## Live lists
+
+A read-only list can follow other programs' writes. `ListWatcher`
+(`crates/admin-core/src/watch.rs`) runs a thread for one list and its filter,
+holding a trunkdb live query for it; the read-only session checks for other
+programs' commits every 500 ms (`WATCH_EVERY` in `session.rs`). The thread
+merges a burst of matching writes into one signal, and the shell emits a
+`collection-changed` event. The frontend then re-reads the page and filter it
+asked for last, not the page on screen.
+
+The shell keeps one watch per session in `AppState.watchers`. Closing the
+session closes it first and then drops the watch, which stops the thread. The
+live query holds no database handle, so it never blocks closing. A stop names
+its collection, and the frontend sends watch calls for a session one after
+another, so a late stop can't remove the watch of a newer list.
+
 ## Reading: one snapshot per request
 
 A page of the list, its total, and the groups are each read in one trunkdb
@@ -135,7 +151,10 @@ action only after a successful save or a discard. Quitting is included:
   results are compared with direct trunkdb calls.
 - **Across processes:** `npm run test:cli` builds the `trunkdb` CLI at the
   pinned release and checks, as a second process, what the app wrote and
-  that the locks let in readers and writers as they should.
+  that the locks let in readers and writers as they should. The live list's
+  check against the pinned CLI is in `tests/watch.rs`, ignored by default:
+  run it with `cargo test -p trunkdb-admin-core --test watch -- --ignored`
+  after `npm run test:cli` has built the CLI.
 - **Frontend:** Vitest in jsdom against a fake backend, with the CodeMirror
   editor replaced by a plain text area; CodeMirror itself has its own tests.
 - **Not covered by tests:** the native dialogs, the menu, quitting and

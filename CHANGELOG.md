@@ -3,15 +3,23 @@
 What changed in each release of TrunkDB Admin, newest first. Each release is
 tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
-## Unreleased
+## 0.2.0 — 2026-11-19
 
-Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.43.0.
+The first release since 0.1.0, with trunkdb 0.43.0 (tag `v0.43.0`). Files
+opened for editing with this version are in file format 17, which 0.1.0 can't
+open.
 
+- **Live lists:** a read-only list follows other programs' writes that match
+  its filter: it refreshes by itself, keeping the page and filter it shows.
+  The toolbar's Live updates button turns it off; the status bar shows
+  "Live · updated HH:MM:SS" beside the trunkdb release while the list is in
+  front. Groups don't follow yet, and a file open for editing isn't watched,
+  since no other program can write to it.
 - **New look:** the logo's navy and petrol, and Plus Jakarta Sans, bundled
   with the app. An open database is laid out as an app window: a navy column
   with the file, its mode, the collections and Close database; a collection's
   sections as tabs under its name; the filter in a tinted band; a status bar
-  with the mode, file format and trunkdb release. The database has three
+  with the mode, file format, trunkdb release and a live list's state. The database has three
   pages in that column, Overview, Storage and Tools, each with its cards side
   by side where the window is wide enough.
 - **A side pane beside the list:** the document, Explain and Statement are
@@ -28,9 +36,8 @@ Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.43.0.
 - **trunkdb 0.43.0** instead of 0.40.0: still file format 17, and the app's
   code needed no change beyond the pin's version and revision in its tests and
   sample data. Among the new
-  things are a clock in filters (`last_seen < now - 10m`), live queries that
-  read again as other programs write, and a last-handle fix; none is shown in
-  the app yet.
+  things are a clock in filters (`last_seen < now - 10m`), live queries, which
+  the live lists above use, and a last-handle fix.
 - **trunkdb 0.40.0** instead of 0.30.0: file format 17, which the app's
   0.1.0 can't open once this version has opened a file for editing. Among
   what comes with it: other programs read a file while it is open here for
