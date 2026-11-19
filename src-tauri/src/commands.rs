@@ -1,16 +1,17 @@
 //! Tauri commands: translate IPC arguments and results, and move the work
 //! off the UI thread. Behavior belongs to `trunkdb-admin-core`.
 
-use crate::state::AppState;
+use crate::state::{AppState, Watch};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use trunkdb_admin_core::{
     AppError, AppResult, CheckReport, CompactReport, ConditionInput, DocumentView, ExplainReport,
-    ExportSummary, FieldPaths, FieldPathsRequest, FilterRows, FormatUpgrade, GroupRequest,
-    GroupResult, ImportSummary, IndexRequest, Overview, QueryRequest, QueryResult, RecentFile,
-    RecentFiles, SaveRequest, SavedDocument, Session, SessionInfo, StorageReport, TrunkdbBuild,
+    ExportSummary, FieldPaths, FieldPathsRequest, FilterInput, FilterRows, FormatUpgrade,
+    GroupRequest, GroupResult, ImportSummary, IndexRequest, ListWatcher, Overview, QueryRequest,
+    QueryResult, RecentFile, RecentFiles, SaveRequest, SavedDocument, Session, SessionInfo,
+    StorageReport, TrunkdbBuild,
 };
 
 /// Database and filesystem work blocks, so it never runs on the thread
@@ -124,7 +125,102 @@ pub async fn database_create(state: State<'_, AppState>, path: PathBuf) -> AppRe
 #[tauri::command]
 pub async fn session_close(state: State<'_, AppState>, session_id: String) -> AppResult<()> {
     let sessions = Arc::clone(&state.sessions);
-    blocking(move || sessions.close(&session_id)).await
+    let watchers = state.watchers_handle();
+    blocking(move || {
+        let closed = sessions.close(&session_id);
+        // After the close, not before: a watch that registers in between
+        // checks for its session once it has, and removes itself.
+        watchers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&session_id);
+        closed
+    })
+    .await
+}
+
+/// What the frontend listens for when a list's documents change, in a
+/// read-only session beside another program's writes.
+pub const LIST_CHANGED: &str = "collection-changed";
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ListChanged {
+    pub session_id: String,
+    pub collection: String,
+}
+
+/// Watches the documents a list shows, replacing the session's earlier
+/// watch. Emits `collection-changed` once for each burst of changes.
+#[tauri::command]
+pub async fn collection_watch(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    collection: String,
+    filter: FilterInput,
+) -> AppResult<()> {
+    let sessions = Arc::clone(&state.sessions);
+    let watchers = state.watchers_handle();
+    blocking(move || {
+        let session = sessions.get(&session_id)?;
+        let (named_session, named_collection) = (session_id.clone(), collection.clone());
+        let watcher = ListWatcher::start(&session, &collection, &filter, move || {
+            // A window that is gone, or a missed event, costs nothing: the
+            // next list read shows the same data.
+            let _ = app.emit(
+                LIST_CHANGED,
+                ListChanged {
+                    session_id: named_session.clone(),
+                    collection: named_collection.clone(),
+                },
+            );
+        })?;
+        watchers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(
+                session_id.clone(),
+                Watch {
+                    collection: collection.clone(),
+                    watcher,
+                },
+            );
+        // A close that finished while this watch was starting may not have
+        // seen it: then the session is gone, and so is its watch.
+        if sessions.get(&session_id).is_err() {
+            watchers
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .remove(&session_id);
+        }
+        Ok(())
+    })
+    .await
+}
+
+/// Stops the session's list watch, if it has one.
+#[tauri::command]
+pub async fn collection_unwatch(
+    state: State<'_, AppState>,
+    session_id: String,
+    collection: String,
+) -> AppResult<()> {
+    let watchers = state.watchers_handle();
+    blocking(move || {
+        let mut map = watchers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Only the watch of this collection: a stop that arrives late must
+        // not take down the watch of the list that replaced it.
+        if map
+            .get(&session_id)
+            .is_some_and(|watch| watch.collection == collection)
+        {
+            map.remove(&session_id);
+        }
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]

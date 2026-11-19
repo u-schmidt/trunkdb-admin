@@ -238,6 +238,12 @@ export interface ResultRow {
   cells: Record<string, Cell>;
 }
 
+/** A watched list's documents changed: its collection, in one session. */
+export interface ListChanged {
+  session_id: string;
+  collection: string;
+}
+
 export interface QueryResult {
   request_id: number;
   total: number;

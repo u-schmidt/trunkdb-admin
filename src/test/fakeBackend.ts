@@ -51,6 +51,9 @@ export function fakeBackend(overrides: Partial<Backend> = {}): Backend {
     collectionQuery: vi.fn(async (_session: string, request: QueryRequest) =>
       resultFor(request, []),
     ),
+    collectionWatch: vi.fn(async () => undefined),
+    collectionUnwatch: vi.fn(async () => undefined),
+    onListChanged: vi.fn(() => () => undefined),
     collectionExplain: vi.fn(async (_session: string, request: QueryRequest) => explainOf(request)),
     collectionFieldPaths: vi.fn(async (_session: string, request: FieldPathsRequest) =>
       fieldPathsOf(

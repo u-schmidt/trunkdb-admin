@@ -1,7 +1,7 @@
 import { Braces, KeyRound, List, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { AppError, CollectionSummary, Overview } from "../../ipc/types";
-import { DocumentsPanel } from "../documents/DocumentsPanel";
+import { DocumentsPanel, type ListState } from "../documents/DocumentsPanel";
 import { FieldPathsProvider, useFieldPaths } from "../fields/FieldPathsContext";
 import { FieldsPanel } from "../fields/FieldsPanel";
 import { IndexPanel } from "../indexes/IndexPanel";
@@ -17,6 +17,7 @@ interface Props {
   onOverview: (request: Promise<Overview>) => Promise<AppError | null>;
   /** Asks to delete this collection; confirmation follows elsewhere. */
   onDelete: () => void;
+  onListState: (state: ListState | null, changedAt: Date | null) => void;
 }
 
 export function CollectionView({
@@ -26,6 +27,7 @@ export function CollectionView({
   onRefreshOverview,
   onOverview,
   onDelete,
+  onListState,
 }: Props) {
   const [section, setSection] = useState<Section>("documents");
   return (
@@ -86,6 +88,7 @@ export function CollectionView({
             collection={collection}
             canMutate={canMutate}
             onRefreshOverview={onRefreshOverview}
+            onListState={onListState}
           />
         </div>
         {section === "fields" && (

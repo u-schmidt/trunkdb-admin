@@ -22,6 +22,7 @@ mod session;
 mod state_file;
 mod statement;
 mod storage;
+mod watch;
 
 pub use documents::{DocumentView, SaveRequest, SavedDocument};
 pub use error::{AppError, AppResult, ErrorCategory, TextPosition};
@@ -46,3 +47,4 @@ pub use session::{
 };
 pub use statement::{groups_statement, query_statement};
 pub use storage::{CollectionStorage, IndexStorage, PageUse, Recovery, StorageReport};
+pub use watch::{ListWatch, ListWatcher, Wait};

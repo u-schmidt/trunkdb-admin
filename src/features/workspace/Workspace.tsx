@@ -10,6 +10,7 @@ import { useBackend } from "../../ipc/BackendContext";
 import type { AppError, AppInfo, CollectionSummary, Overview, SessionInfo } from "../../ipc/types";
 import { ToolsPage } from "../tools/ToolsPage";
 import { useDatabaseTools } from "../tools/useDatabaseTools";
+import { liveStatus, type ListState } from "../documents/DocumentsPanel";
 import { CollectionView } from "./CollectionView";
 import { DatabaseOverview } from "./DatabaseOverview";
 import type { DatabasePageName } from "./DatabasePage";
@@ -55,6 +56,15 @@ export function Workspace({
   const [deleting, setDeleting] = useState<CollectionSummary | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState<AppError | null>(null);
+  // The list in front reports whether it follows other programs' changes.
+  const [listLive, setListLive] = useState<{ state: ListState; changedAt: Date | null } | null>(
+    null,
+  );
+  const onListState = useCallback(
+    (state: ListState | null, changedAt: Date | null) =>
+      setListLive(state === null ? null : { state, changedAt }),
+    [],
+  );
   const [selected, setSelected] = useState<string | null>(null);
   // A database page is shown over the selected collection, which stays
   // mounted beneath it: a look at the file facts or a run of the tools
@@ -232,6 +242,7 @@ export function Workspace({
               onRefreshOverview={refresh}
               onOverview={show}
               onDelete={() => requestDelete(current)}
+              onListState={onListState}
             />
           </div>
         )}
@@ -243,6 +254,16 @@ export function Workspace({
         </span>
         <span>File format {(overview?.file ?? session.file).format_version}</span>
         {appInfo !== null && <span>trunkdb {appInfo.trunkdb.version}</span>}
+        {listLive !== null &&
+          shownPage === null &&
+          liveStatus(listLive.state, listLive.changedAt) !== null && (
+            <span
+              className="status-live"
+              title={liveStatus(listLive.state, listLive.changedAt)?.title}
+            >
+              {liveStatus(listLive.state, listLive.changedAt)?.text}
+            </span>
+          )}
         {collections !== null && (
           <span className="status-end">
             {collections.length === 1 ? "1 collection" : `${collections.length} collections`}

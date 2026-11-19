@@ -1907,3 +1907,9 @@ button.danger-quiet {
   padding: 0.5rem 1.25rem;
   border-bottom: 1px solid var(--border);
 }
+
+.status-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
