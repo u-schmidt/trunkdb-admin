@@ -219,6 +219,11 @@ impl Default for SessionManager {
     }
 }
 
+/// How often a read-only session looks for other programs' commits to its
+/// live lists (trunkdb's `watch_every`): the most a list lags behind a write
+/// beside it. A look is a few microseconds on the WAL, so 500 ms is cheap.
+const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(500);
+
 impl SessionManager {
     pub fn new() -> Self {
         let run = std::time::SystemTime::now()
@@ -314,7 +319,9 @@ impl SessionManager {
             }
             Ok(Database::open_with(
                 path,
-                OpenOptions::default().read_only(read_only),
+                OpenOptions::default()
+                    .read_only(read_only)
+                    .watch_every(WATCH_EVERY),
             )?)
         })
     }
