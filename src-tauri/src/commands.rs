@@ -127,13 +127,14 @@ pub async fn session_close(state: State<'_, AppState>, session_id: String) -> Ap
     let sessions = Arc::clone(&state.sessions);
     let watchers = state.watchers_handle();
     blocking(move || {
-        // The watch goes first: it holds no file, but its thread should not
-        // outlive the session it reads.
+        let closed = sessions.close(&session_id);
+        // After the close, not before: a watch that registers in between
+        // checks for its session once it has, and removes itself.
         watchers
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .remove(&session_id);
-        sessions.close(&session_id)
+        closed
     })
     .await
 }
@@ -177,7 +178,15 @@ pub async fn collection_watch(
         watchers
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .insert(session_id, watcher);
+            .insert(session_id.clone(), watcher);
+        // A close that finished while this watch was starting may not have
+        // seen it: then the session is gone, and so is its watch.
+        if sessions.get(&session_id).is_err() {
+            watchers
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .remove(&session_id);
+        }
         Ok(())
     })
     .await
