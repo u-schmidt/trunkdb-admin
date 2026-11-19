@@ -35,6 +35,7 @@ import { isEmptyFilter, sameFilter } from "./filter";
 import { FilterBuilder, type FilterDraft, type FilterMistake } from "./FilterBuilder";
 import { GroupsView } from "./GroupsView";
 import { JsonResults } from "./JsonResults";
+import { LiveLine } from "./LiveLine";
 import { Pager } from "./Pager";
 import { TableResults } from "./TableResults";
 import { useCollectionQuery } from "./useCollectionQuery";
@@ -64,10 +65,16 @@ interface Props {
 export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOverview }: Props) {
   const backend = useBackend();
   const guard = useDraftGuard();
-  // Read-only: another program's writes reach the list while it is open here.
-  const query = useCollectionQuery(sessionId, collection.name, !canMutate);
-  const { result, applied, requested, loading, error } = query;
   const [view, setView] = useState<View>("json");
+  // The list reads again when another program changes it: read-only lists,
+  // while Live is on and the list (not the groups) is in front.
+  const [liveOn, setLiveOn] = useState(true);
+  const query = useCollectionQuery(
+    sessionId,
+    collection.name,
+    !canMutate && liveOn && view !== "groups",
+  );
+  const { result, applied, requested, loading, error } = query;
   const [dismissed, setDismissed] = useState<object | null>(null);
   const [choosing, setChoosing] = useState(false);
   // The side pane: shown or not, its width, and the page in front.
@@ -451,6 +458,13 @@ export function DocumentsPanel({ sessionId, collection, canMutate, onRefreshOver
             onPageSize={(pageSize) => query.apply({ ...requested, pageSize })}
           />
         )}
+        <LiveLine
+          canMutate={canMutate}
+          grouped={grouped}
+          on={liveOn}
+          changedAt={query.changedAt}
+          onToggle={() => setLiveOn((current) => !current)}
+        />
       </div>
       {/* Hidden rather than unmounted: an unsaved document survives a
           hidden pane, as it does another tab in front. */}

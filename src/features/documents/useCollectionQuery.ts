@@ -51,6 +51,8 @@ export interface CollectionQuery {
   setHint: (hint: HintInput | null) => void;
   /** Same criteria and page, read again. */
   refresh: () => void;
+  /** When the list last read again because its documents changed; null before. */
+  changedAt: Date | null;
 }
 
 /**
@@ -73,6 +75,7 @@ export function useCollectionQuery(
   const [requested, setRequested] = useState<Criteria>(DEFAULT_CRITERIA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AppError | null>(null);
+  const [changedAt, setChangedAt] = useState<Date | null>(null);
   const newest = useRef(0);
   const position = useRef({ criteria: DEFAULT_CRITERIA, page: 0 });
 
@@ -167,6 +170,7 @@ export function useCollectionQuery(
     if (!live) return;
     const stop = backend.onListChanged((change) => {
       if (change.session_id === sessionId && change.collection === collection) {
+        setChangedAt(new Date());
         refreshRef.current();
       }
     });
@@ -180,5 +184,17 @@ export function useCollectionQuery(
     };
   }, [backend, sessionId, collection, live]);
 
-  return { result, applied, requested, loading, error, apply, goToPage, choose, setHint, refresh };
+  return {
+    result,
+    applied,
+    requested,
+    loading,
+    error,
+    apply,
+    goToPage,
+    choose,
+    setHint,
+    refresh,
+    changedAt,
+  };
 }

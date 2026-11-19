@@ -38,12 +38,13 @@ async function openTasks(backend: Backend, readOnly: boolean) {
   await screen.findByRole("list", { name: "Documents as JSON" });
 }
 
-function tasksBackend() {
+function tasksBackend(overrides: Partial<Backend> = {}) {
   return fakeBackend({
     sessionOverview: vi.fn(async () => overviewOf(collection("tasks", 2))),
     collectionQuery: vi.fn(async (_session: string, request: QueryRequest) =>
       resultFor(request, [objectRow("id-1")], 1),
     ),
+    ...overrides,
   });
 }
 
@@ -87,5 +88,54 @@ describe("a read-only list that other programs write beside", () => {
 
     expect(backend.collectionWatch).not.toHaveBeenCalled();
     expect(backend.onListChanged).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Live line under the list", () => {
+  it("says when the list last changed", async () => {
+    const backend = tasksBackend();
+    await openTasks(backend, true);
+    expect(screen.getByText(/Live: other programs/)).toBeInTheDocument();
+
+    listener(backend)({ session_id: "s1", collection: "tasks" });
+
+    expect(await screen.findByText(/updated \d/)).toBeInTheDocument();
+  });
+
+  it("turns the watch off and on with its button", async () => {
+    const stop = vi.fn();
+    const backend = tasksBackend({ onListChanged: vi.fn(() => stop) });
+    await openTasks(backend, true);
+    const user = userEvent.setup();
+    const toggle = screen.getByRole("button", { name: "Live updates" });
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Live updates are off")).toBeInTheDocument();
+    expect(backend.collectionUnwatch).toHaveBeenCalledWith("s1");
+    expect(stop).toHaveBeenCalled();
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(backend.collectionWatch).toHaveBeenCalledTimes(2));
+  });
+
+  it("says an editing session is not live, with no toggle", async () => {
+    const backend = tasksBackend();
+    await openTasks(backend, false);
+
+    expect(screen.getByText(/Not live: the file is open for editing/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Live updates" })).toBeNull();
+  });
+
+  it("says the groups are not live", async () => {
+    const backend = tasksBackend();
+    await openTasks(backend, true);
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Groups" }));
+
+    expect(await screen.findByText(/Groups are not live/)).toBeInTheDocument();
   });
 });
