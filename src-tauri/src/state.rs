@@ -4,6 +4,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use trunkdb_admin_core::{ListWatcher, Preferences, RecentFiles, SessionManager};
 
+/// A session's list watch: the collection it watches and the watcher.
+pub struct Watch {
+    pub collection: String,
+    /// Held, never read: dropping it stops the watch.
+    #[allow(dead_code)]
+    pub watcher: ListWatcher,
+}
+
 /// The services shared by all commands. `Arc`s, because each command
 /// moves its work onto a blocking thread.
 pub struct AppState {
@@ -15,7 +23,7 @@ pub struct AppState {
     unsaved_draft: AtomicBool,
     /// The list watch of each session that has one. Dropping a watcher
     /// stops it, so closing a session removes its entry.
-    watchers: Arc<Mutex<HashMap<String, ListWatcher>>>,
+    watchers: Arc<Mutex<HashMap<String, Watch>>>,
 }
 
 impl AppState {
@@ -31,7 +39,7 @@ impl AppState {
     }
 
     /// The shared watcher map, for the commands that start and stop watches.
-    pub fn watchers_handle(&self) -> Arc<Mutex<HashMap<String, ListWatcher>>> {
+    pub fn watchers_handle(&self) -> Arc<Mutex<HashMap<String, Watch>>> {
         Arc::clone(&self.watchers)
     }
 

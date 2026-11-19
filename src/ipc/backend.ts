@@ -63,7 +63,8 @@ export interface Backend {
    * replaces the session's earlier watch. Its changes come as `onListChanged`.
    */
   collectionWatch(sessionId: string, collection: string, filter: FilterInput): Promise<void>;
-  collectionUnwatch(sessionId: string): Promise<void>;
+  /** Stops the session's watch, if it is this collection's. */
+  collectionUnwatch(sessionId: string, collection: string): Promise<void>;
   /** Calls `handler` for each burst of changes to a watched list; returns how to stop. */
   onListChanged(handler: (change: ListChanged) => void): () => void;
   /** Every field path of a collection's documents, counted; reads them all. */
@@ -163,7 +164,8 @@ export const tauriBackend: Backend = {
   collectionQuery: (sessionId, request) => invoke("collection_query", { sessionId, request }),
   collectionWatch: (sessionId, collection, filter) =>
     invoke("collection_watch", { sessionId, collection, filter }),
-  collectionUnwatch: (sessionId) => invoke("collection_unwatch", { sessionId }),
+  collectionUnwatch: (sessionId, collection) =>
+    invoke("collection_unwatch", { sessionId, collection }),
   onListChanged: (handler) => {
     const stop = listen<ListChanged>("collection-changed", (event) => handler(event.payload));
     return () => void stop.then((unlisten) => unlisten());

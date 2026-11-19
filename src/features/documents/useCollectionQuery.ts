@@ -20,6 +20,22 @@ export interface Criteria {
 
 export const PAGE_SIZES = [25, 50, 100] as const;
 
+/**
+ * Watch calls per session, each after the one before, so a stop and a start
+ * made in order reach the backend in order, whatever the timing of the
+ * requests.
+ */
+const watchQueues = new Map<string, Promise<unknown>>();
+
+function queueWatch(sessionId: string, call: () => Promise<unknown>): void {
+  const previous = watchQueues.get(sessionId) ?? Promise.resolve();
+  // A call that fails leaves the queue going: a refused watch shows nothing.
+  watchQueues.set(
+    sessionId,
+    previous.then(call).catch(() => undefined),
+  );
+}
+
 export const DEFAULT_CRITERIA: Criteria = {
   filter: NO_FILTER,
   sort: { field: "_id", descending: false },
@@ -79,6 +95,10 @@ export function useCollectionQuery(
   const newest = useRef(0);
   const position = useRef({ criteria: DEFAULT_CRITERIA, page: 0 });
 
+  // The newest request's criteria and page: what the user asked for, which
+  // a change or a refresh reads again, even while that request is running.
+  const wanted = useRef({ criteria: DEFAULT_CRITERIA, page: 0 });
+
   /** Sends a request; the returned handlers ignore all but the newest. */
   const send = useCallback(
     (criteria: Criteria, page: number) => {
@@ -100,6 +120,9 @@ export function useCollectionQuery(
             if (answer.request_id !== newest.current) return;
             // The backend may have moved to the last page that exists.
             position.current = { criteria, page: answer.page };
+            // What the list shows is what a refresh asks for, the page the
+            // backend moved to included.
+            wanted.current = { criteria, page: answer.page };
             setResult(answer);
             setApplied(criteria);
             setError(null);
@@ -117,6 +140,7 @@ export function useCollectionQuery(
 
   const run = useCallback(
     (criteria: Criteria, page: number) => {
+      wanted.current = { criteria, page };
       setLoading(true);
       setRequested(criteria);
       void send(criteria, page);
@@ -136,19 +160,15 @@ export function useCollectionQuery(
   // The watch is replaced whenever the applied filter changes. Calls go
   // out one after another, so an older filter's watch can't land last.
   const watched = JSON.stringify(applied.filter);
-  const watchQueue = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
     if (!live) return;
     const filter = JSON.parse(watched) as FilterInput;
-    watchQueue.current = watchQueue.current
-      .then(() => backend.collectionWatch(sessionId, collection, filter))
-      // A filter the query refused is shown by the query; nothing to watch.
-      .catch(() => undefined);
+    queueWatch(sessionId, () => backend.collectionWatch(sessionId, collection, filter));
   }, [backend, sessionId, collection, live, watched]);
 
   const apply = useCallback((criteria: Criteria) => run(criteria, 0), [run]);
   const goToPage = useCallback((page: number) => run(position.current.criteria, page), [run]);
-  const refresh = useCallback(() => run(position.current.criteria, position.current.page), [run]);
+  const refresh = useCallback(() => run(wanted.current.criteria, wanted.current.page), [run]);
   const choose = useCallback(
     (select: string[] | null, except: string[] = []) =>
       run({ ...position.current.criteria, select, except }, position.current.page),
@@ -176,11 +196,10 @@ export function useCollectionQuery(
     });
     return () => {
       stop();
-      // The session's watch goes with the view. Queued after any watch call
-      // still under way, so it can't be replaced by one.
-      void watchQueue.current
-        .then(() => backend.collectionUnwatch(sessionId))
-        .catch(() => undefined);
+      // This collection's watch goes with the view. Queued behind any watch
+      // call made earlier, and it names the collection, so it cannot stop
+      // the watch of a list that replaced this one.
+      queueWatch(sessionId, () => backend.collectionUnwatch(sessionId, collection));
     };
   }, [backend, sessionId, collection, live]);
 

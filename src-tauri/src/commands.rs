@@ -1,7 +1,7 @@
 //! Tauri commands: translate IPC arguments and results, and move the work
 //! off the UI thread. Behavior belongs to `trunkdb-admin-core`.
 
-use crate::state::AppState;
+use crate::state::{AppState, Watch};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -178,7 +178,13 @@ pub async fn collection_watch(
         watchers
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .insert(session_id.clone(), watcher);
+            .insert(
+                session_id.clone(),
+                Watch {
+                    collection: collection.clone(),
+                    watcher,
+                },
+            );
         // A close that finished while this watch was starting may not have
         // seen it: then the session is gone, and so is its watch.
         if sessions.get(&session_id).is_err() {
@@ -194,13 +200,24 @@ pub async fn collection_watch(
 
 /// Stops the session's list watch, if it has one.
 #[tauri::command]
-pub async fn collection_unwatch(state: State<'_, AppState>, session_id: String) -> AppResult<()> {
+pub async fn collection_unwatch(
+    state: State<'_, AppState>,
+    session_id: String,
+    collection: String,
+) -> AppResult<()> {
     let watchers = state.watchers_handle();
     blocking(move || {
-        watchers
+        let mut map = watchers
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .remove(&session_id);
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Only the watch of this collection: a stop that arrives late must
+        // not take down the watch of the list that replaced it.
+        if map
+            .get(&session_id)
+            .is_some_and(|watch| watch.collection == collection)
+        {
+            map.remove(&session_id);
+        }
         Ok(())
     })
     .await
