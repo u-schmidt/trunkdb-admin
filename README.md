@@ -80,9 +80,11 @@ trunkdb that last wrote the file, and offers to open it read-only instead.
 
 While the app has a database open for editing, other programs using trunkdb
 0.40.0 or newer can read it at the same time, but not write to it. Opened
-read-only here, the file stays open to another program that writes: the app
-reads what it wrote, and a read that is under way when it writes stops with
-"The data changed while it was being read"; reading again shows the new state.
+read-only here, the file stays open to another program that writes: a
+read-only list follows what it wrote, refreshing by itself when a write
+matches its filter (the Live updates button turns that off; Groups don't
+follow). A read that is under way when it writes stops with "The data changed
+while it was being read"; reading again shows the new state.
 trunkdb keeps four lock files beside each database it opens (`.writer`,
 `.readers`, `.gate`, `.letgo`) and leaves them there.
 
@@ -96,6 +98,7 @@ else is stored outside your database files.
 
 - A file another program has open for writing can be opened here read-only,
   not for editing.
+- Live lists don't cover Groups.
 - The groups are made anew for every page shown, and trunkdb holds them all in
   memory, so grouping by a field with a different value in every document
   makes as many groups as documents each time.
