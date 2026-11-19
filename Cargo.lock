@@ -3986,9 +3986,10 @@ dependencies = [
 
 [[package]]
 name = "trunkdb"
-version = "0.40.0"
-source = "git+https://github.com/u-schmidt/trunkdb.git?tag=v0.40.0#f4ae88cc506a604d5d205701d8b6ec77a302e285"
+version = "0.43.0"
+source = "git+https://github.com/u-schmidt/trunkdb.git?tag=v0.43.0#048ca37ab374cba5397c14fa252400fccb6568f9"
 dependencies = [
+ "crossbeam-utils",
  "indexmap 2.14.2",
  "regex",
  "regex-syntax",

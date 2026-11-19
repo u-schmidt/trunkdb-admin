@@ -104,6 +104,40 @@ describe("switching between rows and text", () => {
     expect(backend.filterToRows).toHaveBeenCalledWith("n > 3");
   });
 
+  it("takes a comparison with the clock as an age row", async () => {
+    const backend = tasksBackend({
+      filterToRows: vi.fn(async () => ({
+        rows: [{ field: "last_seen", operator: "older_than" as const, value: null, age: "10m" }],
+      })),
+    });
+    const user = await openTasks(backend);
+    await toText(user);
+    enter("last_seen < now - 10m");
+
+    await toRows(user);
+
+    expect(await screen.findByLabelText("Condition 1 operator")).toHaveValue("older_than");
+    expect(screen.getByLabelText("Condition 1 age")).toHaveValue("10m");
+    expect(screen.queryByLabelText("Condition 1 value")).toBeNull();
+  });
+
+  it("sends an age row with its age, trimmed, on Run", async () => {
+    const backend = tasksBackend();
+    const user = await openTasks(backend);
+    await user.click(screen.getByRole("button", { name: "Add condition" }));
+    await user.type(screen.getByLabelText("Condition 1 field path"), "last_seen");
+    await user.selectOptions(screen.getByLabelText("Condition 1 operator"), "newer_than");
+    await user.type(screen.getByLabelText("Condition 1 age"), " 10m ");
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    await waitFor(() =>
+      expect(lastQuery(backend).filter).toEqual({
+        rows: [{ field: "last_seen", operator: "newer_than", value: null, age: "10m" }],
+      }),
+    );
+  });
+
   it("keeps the text and says why when rows can't show it", async () => {
     const backend = tasksBackend({
       filterToRows: vi.fn(async () => ({

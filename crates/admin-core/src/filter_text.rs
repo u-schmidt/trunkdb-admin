@@ -5,7 +5,7 @@
 //! the list's query as a `trunkdb find` command.
 
 use crate::error::{AppError, AppResult, TextPosition};
-use crate::query::{ConditionInput, KindInput, Operator, QueryRequest, ValueInput};
+use crate::query::{ConditionInput, KindInput, Operator, QueryRequest, ValueInput, format_age};
 use crate::session::Session;
 use serde::Serialize;
 use trunkdb::Document;
@@ -148,6 +148,22 @@ fn row(condition: &Condition) -> Result<ConditionInput, String> {
             },
             _ => Err("a `not`".into()),
         },
+        Condition::AgainstNow {
+            field, op, offset, ..
+        } => {
+            if offset.is_after() {
+                return Err("a time after `now`".into());
+            }
+            let operator = match op {
+                Op::Lt => Operator::OlderThan,
+                Op::Gte => Operator::NewerThan,
+                _ => return Err("a `now` comparison with `<=` or `>`".into()),
+            };
+            Ok(ConditionInput {
+                age: Some(format_age(offset.duration())),
+                ..row(field, operator)
+            })
+        }
         Condition::Compare {
             field, op, value, ..
         } => {

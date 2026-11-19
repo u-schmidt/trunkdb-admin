@@ -5,7 +5,7 @@ tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
 ## Unreleased
 
-Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.40.0.
+Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.43.0.
 
 - **New look:** the logo's navy and petrol, and Plus Jakarta Sans, bundled
   with the app. An open database is laid out as an app window: a navy column
@@ -21,6 +21,16 @@ Catching up with what trunkdb 0.30.0 offers, then bundling trunkdb 0.40.0.
   the editor has no Close, and a new document is dropped with Discard. With
   much open above the list, the documents column scrolls on its own and the
   window stays put.
+- **Filter rows compare with the clock:** "is older than (ago)" and "is newer
+  than (ago)" take an age such as `10m` and print as trunkdb's `last_seen < now -
+  10m`; text with the same shape reads back into rows, and the rest of the clock
+  (`=`, `+`, `<=`, `>`) stays text.
+- **trunkdb 0.43.0** instead of 0.40.0: still file format 17, and the app's
+  code needed no change beyond the pin's version and revision in its tests and
+  sample data. Among the new
+  things are a clock in filters (`last_seen < now - 10m`), live queries that
+  read again as other programs write, and a last-handle fix; none is shown in
+  the app yet.
 - **trunkdb 0.40.0** instead of 0.30.0: file format 17, which the app's
   0.1.0 can't open once this version has opened a file for editing. Among
   what comes with it: other programs read a file while it is open here for
