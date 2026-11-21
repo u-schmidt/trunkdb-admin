@@ -11,7 +11,7 @@ import type { AppError, AppInfo, CollectionSummary, Overview, SessionInfo } from
 import { ToolsPage } from "../tools/ToolsPage";
 import { useDatabaseTools } from "../tools/useDatabaseTools";
 import { liveStatus, type ListState } from "../documents/DocumentsPanel";
-import { CollectionView } from "./CollectionView";
+import { CollectionView, type Section } from "./CollectionView";
 import { DatabaseOverview } from "./DatabaseOverview";
 import type { DatabasePageName } from "./DatabasePage";
 import { Sidebar } from "./Sidebar";
@@ -71,6 +71,8 @@ export function Workspace({
   // costs neither the filter and page nor an open document draft.
   // null: the collection is shown.
   const [page, setPage] = useState<DatabasePageName | null>("overview");
+  // The tab in front stays when another collection is chosen.
+  const [section, setSection] = useState<Section>("documents");
   // Overviews arrive from refreshes and from collection changes; only the
   // answer to the newest request may be shown.
   const newest = useRef(0);
@@ -243,6 +245,8 @@ export function Workspace({
               onOverview={show}
               onDelete={() => requestDelete(current)}
               onListState={onListState}
+              section={section}
+              onSection={setSection}
             />
           </div>
         )}
