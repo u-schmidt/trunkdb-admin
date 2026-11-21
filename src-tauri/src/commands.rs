@@ -3,15 +3,17 @@
 
 use crate::state::{AppState, Watch};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 use trunkdb_admin_core::{
     AppError, AppResult, CheckReport, CompactReport, ConditionInput, DocumentView, ExplainReport,
     ExportSummary, FieldPaths, FieldPathsRequest, FilterInput, FilterRows, FormatUpgrade,
     GroupRequest, GroupResult, ImportSummary, IndexRequest, ListWatcher, Overview, QueryRequest,
     QueryResult, RecentFile, RecentFiles, SaveRequest, SavedDocument, Session, SessionInfo,
-    StorageReport, TrunkdbBuild,
+    SessionManager, StorageReport, TrunkdbBuild,
 };
 
 /// Database and filesystem work blocks, so it never runs on the thread
@@ -149,6 +151,50 @@ pub struct ListChanged {
     pub collection: String,
 }
 
+/// Calls `app`'s `collection-changed` for the list or groups of
+/// `collection` in `session_id`, each time the watch signals.
+fn change_notice(app: AppHandle, session_id: String, collection: String) -> impl Fn() + Send {
+    move || {
+        // A window that is gone, or a missed event, costs nothing: the
+        // next read shows the same data.
+        let _ = app.emit(
+            LIST_CHANGED,
+            ListChanged {
+                session_id: session_id.clone(),
+                collection: collection.clone(),
+            },
+        );
+    }
+}
+
+/// Stores `watcher` as the session's watch in place of an earlier one.
+fn keep_watch(
+    watchers: &Mutex<HashMap<String, Watch>>,
+    sessions: &SessionManager,
+    session_id: String,
+    collection: String,
+    watcher: ListWatcher,
+) {
+    watchers
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(
+            session_id.clone(),
+            Watch {
+                collection,
+                watcher,
+            },
+        );
+    // A close that finished while this watch was starting may not have
+    // seen it: then the session is gone, and so is its watch.
+    if sessions.get(&session_id).is_err() {
+        watchers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&session_id);
+    }
+}
+
 /// Watches the documents a list shows, replacing the session's earlier
 /// watch. Emits `collection-changed` once for each burst of changes.
 #[tauri::command]
@@ -163,36 +209,32 @@ pub async fn collection_watch(
     let watchers = state.watchers_handle();
     blocking(move || {
         let session = sessions.get(&session_id)?;
-        let (named_session, named_collection) = (session_id.clone(), collection.clone());
-        let watcher = ListWatcher::start(&session, &collection, &filter, move || {
-            // A window that is gone, or a missed event, costs nothing: the
-            // next list read shows the same data.
-            let _ = app.emit(
-                LIST_CHANGED,
-                ListChanged {
-                    session_id: named_session.clone(),
-                    collection: named_collection.clone(),
-                },
-            );
-        })?;
-        watchers
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .insert(
-                session_id.clone(),
-                Watch {
-                    collection: collection.clone(),
-                    watcher,
-                },
-            );
-        // A close that finished while this watch was starting may not have
-        // seen it: then the session is gone, and so is its watch.
-        if sessions.get(&session_id).is_err() {
-            watchers
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .remove(&session_id);
-        }
+        let notice = change_notice(app, session_id.clone(), collection.clone());
+        let watcher = ListWatcher::start(&session, &collection, &filter, notice)?;
+        keep_watch(&watchers, &sessions, session_id, collection, watcher);
+        Ok(())
+    })
+    .await
+}
+
+/// Watches the groups a groups view shows, replacing the session's earlier
+/// watch. Emits `collection-changed` once for each burst of changes, as
+/// `collection_watch` does for a list.
+#[tauri::command]
+pub async fn collection_groups_watch(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    request: GroupRequest,
+) -> AppResult<()> {
+    let sessions = Arc::clone(&state.sessions);
+    let watchers = state.watchers_handle();
+    blocking(move || {
+        let session = sessions.get(&session_id)?;
+        let collection = request.collection.clone();
+        let notice = change_notice(app, session_id.clone(), collection.clone());
+        let watcher = ListWatcher::start_groups(&session, &request, notice)?;
+        keep_watch(&watchers, &sessions, session_id, collection, watcher);
         Ok(())
     })
     .await

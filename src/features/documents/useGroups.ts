@@ -9,6 +9,7 @@ import type {
   GroupResult,
   GroupSort,
 } from "../../ipc/types";
+import { queueWatch } from "./watchQueue";
 
 /** How documents are grouped, apart from which documents and the page. */
 export interface GroupSettings {
@@ -37,6 +38,8 @@ export interface Groups {
   loading: boolean;
   /** The newest request's failure. */
   error: AppError | null;
+  /** When the groups last read again because their documents changed; null before. */
+  changedAt: Date | null;
   /** Groups `ask`, from the first page. */
   run: (ask: GroupAsk) => void;
   goToPage: (page: number) => void;
@@ -48,16 +51,24 @@ export interface Groups {
  * Runs a collection's group queries in the backend (trunkdb SPEC §107),
  * keeping only the answer to the newest request, as `useCollectionQuery`
  * does. Nothing runs until the first `run`.
+ *
+ * With `live`, the groups are read again whenever the backend reports that
+ * the documents they count changed: a read-only session beside another
+ * program's writes. The watch follows the applied groups, not their page.
  */
-export function useGroups(sessionId: string, collection: string): Groups {
+export function useGroups(sessionId: string, collection: string, live = false): Groups {
   const backend = useBackend();
   const [result, setResult] = useState<GroupResult | null>(null);
   const [applied, setApplied] = useState<GroupAsk | null>(null);
   const [requested, setRequested] = useState<GroupAsk | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
+  const [changedAt, setChangedAt] = useState<Date | null>(null);
   const newest = useRef(0);
   const position = useRef<{ ask: GroupAsk; page: number } | null>(null);
+  // The newest request's ask and page: what a change or a refresh reads
+  // again, even while that request is still running.
+  const wanted = useRef<{ ask: GroupAsk; page: number } | null>(null);
 
   const requestFor = useCallback(
     (ask: GroupAsk, page: number, requestId: number): GroupRequest => ({
@@ -84,6 +95,7 @@ export function useGroups(sessionId: string, collection: string): Groups {
           if (answer.request_id !== newest.current) return;
           // The backend may have moved to the last page that exists.
           position.current = { ask, page: answer.page };
+          wanted.current = { ask, page: answer.page };
           setResult(answer);
           setApplied(ask);
           setError(null);
@@ -107,13 +119,67 @@ export function useGroups(sessionId: string, collection: string): Groups {
     [],
   );
 
-  const run = useCallback((ask: GroupAsk) => send(ask, 0), [send]);
-  const goToPage = useCallback(
-    (page: number) => {
-      if (position.current !== null) send(position.current.ask, page);
+  const run = useCallback(
+    (ask: GroupAsk) => {
+      wanted.current = { ask, page: 0 };
+      send(ask, 0);
     },
     [send],
   );
+  const goToPage = useCallback(
+    (page: number) => {
+      if (position.current === null) return;
+      wanted.current = { ask: position.current.ask, page };
+      send(position.current.ask, page);
+    },
+    [send],
+  );
+  // Same groups and page, read again.
+  const refresh = useCallback(() => {
+    if (wanted.current !== null) send(wanted.current.ask, wanted.current.page);
+  }, [send]);
 
-  return { result, applied, requested, loading, error, run, goToPage, requestFor };
+  // The refresh a change asks for, read through a ref as the list's is.
+  const refreshRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
+  // Set while the watch is off. A watch that starts again reports only the
+  // documents there now, so when none match it reports nothing, and rows
+  // removed meanwhile would stay: the list is read again once it starts.
+  const missed = useRef(false);
+
+  // The watch is replaced whenever the applied groups change. Keyed on their
+  // text, so a page change alone doesn't start a new watch.
+  const appliedKey = applied === null ? null : JSON.stringify(applied);
+  useEffect(() => {
+    if (!live || appliedKey === null) return;
+    const ask = JSON.parse(appliedKey) as GroupAsk;
+    queueWatch(sessionId, async () => {
+      await backend.collectionGroupsWatch(sessionId, requestFor(ask, 0, 0));
+      if (missed.current) {
+        missed.current = false;
+        refreshRef.current();
+      }
+    });
+  }, [backend, sessionId, live, appliedKey, requestFor]);
+
+  useEffect(() => {
+    if (!live) return;
+    const stop = backend.onListChanged((change) => {
+      if (change.session_id === sessionId && change.collection === collection) {
+        setChangedAt(new Date());
+        refreshRef.current();
+      }
+    });
+    return () => {
+      stop();
+      missed.current = true;
+      // Queued behind any watch call made earlier, and it names the
+      // collection, so it cannot stop a watch that replaced this one.
+      queueWatch(sessionId, () => backend.collectionUnwatch(sessionId, collection));
+    };
+  }, [backend, sessionId, collection, live]);
+
+  return { result, applied, requested, loading, error, changedAt, run, goToPage, requestFor };
 }

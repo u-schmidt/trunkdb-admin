@@ -466,6 +466,7 @@ export function demoBackend(): Backend {
     quit: async () => undefined,
     collectionWatch: async () => undefined,
     collectionUnwatch: async () => undefined,
+    collectionGroupsWatch: async () => undefined,
     onListChanged: () => () => undefined,
     collectionQuery: (_session, request: QueryRequest) => {
       let conditions: ConditionInput[];

@@ -73,6 +73,11 @@ merges a burst of matching writes into one signal, and the shell emits a
 `collection-changed` event. The frontend then re-reads the page and filter it
 asked for last, not the page on screen.
 
+Groups use the same watch. `watch_groups` starts trunkdb's live aggregate for
+the request (`watch_aggregate`), and the frontend reads the groups again as it
+does a list. The aggregate runs again whole for each change, so the watch costs
+more than a list's.
+
 The shell keeps one watch per session in `AppState.watchers`. Closing the
 session closes it first and then drops the watch, which stops the thread. The
 live query holds no database handle, so it never blocks closing. A stop names

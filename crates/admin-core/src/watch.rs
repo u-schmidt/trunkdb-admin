@@ -7,12 +7,13 @@
 //! dropped, and says so through `Wait::Ended`.
 
 use crate::error::{AppError, AppResult, ErrorCategory};
+use crate::groups::GroupRequest;
 use crate::query::FilterInput;
 use crate::session::Session;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
-use trunkdb::{Document, LiveQuery};
+use trunkdb::{Document, LiveAggregate, LiveQuery};
 
 /// How long one wait lasts before the thread looks whether to stop.
 const STOP_CHECK: Duration = Duration::from_millis(250);
@@ -32,21 +33,39 @@ pub enum Wait {
     Ended,
 }
 
-/// A live query on a collection's documents matching a list's filter.
+/// What a watch reports on: a list's documents, or a groups view's rows.
+enum Source {
+    /// The documents a list's filter finds.
+    Documents(LiveQuery<Document>),
+    /// The rows a group request makes, counted again as they change.
+    Groups(LiveAggregate),
+}
+
+/// A live watch on a list's documents, or on the groups a request makes.
 pub struct ListWatch {
-    query: LiveQuery<Document>,
+    source: Source,
 }
 
 impl ListWatch {
     /// Waits at most `timeout` for a report.
     pub fn wait(&self, timeout: Duration) -> Wait {
-        match self.query.recv_timeout(timeout) {
-            Some(Ok(_)) => Wait::Changed,
-            // An error ends the watch the same way a dropped database does.
-            Some(Err(_)) => Wait::Ended,
-            None if self.query.has_ended() => Wait::Ended,
-            None => Wait::Quiet,
+        match &self.source {
+            Source::Documents(query) => wait_for(query.recv_timeout(timeout), || query.has_ended()),
+            Source::Groups(aggregate) => {
+                wait_for(aggregate.recv_timeout(timeout), || aggregate.has_ended())
+            }
         }
+    }
+}
+
+/// The outcome of one wait: a report, an error (which ends the watch the
+/// same way a dropped database does), or nothing yet.
+fn wait_for<T>(next: Option<trunkdb::Result<T>>, has_ended: impl Fn() -> bool) -> Wait {
+    match next {
+        Some(Ok(_)) => Wait::Changed,
+        Some(Err(_)) => Wait::Ended,
+        None if has_ended() => Wait::Ended,
+        None => Wait::Quiet,
     }
 }
 
@@ -61,7 +80,26 @@ impl Session {
                 .collection::<Document>(collection)
                 .watch(filter)
                 .map_err(AppError::from)?;
-            Ok(ListWatch { query })
+            Ok(ListWatch {
+                source: Source::Documents(query),
+            })
+        })
+    }
+
+    /// Watches the groups `request` makes, from now on: trunkdb runs the
+    /// aggregate again as the documents it counts change. The first reports
+    /// are the groups already there, as for `watch_list`.
+    pub fn watch_groups(&self, request: &GroupRequest) -> AppResult<ListWatch> {
+        let conditions = request.conditions()?;
+        let built = request.build()?;
+        self.read(|database| {
+            let aggregate = database
+                .collection::<Document>(&request.collection)
+                .watch_aggregate(conditions, &built.aggregate)
+                .map_err(AppError::from)?;
+            Ok(ListWatch {
+                source: Source::Groups(aggregate),
+            })
         })
     }
 }
@@ -83,6 +121,20 @@ impl ListWatcher {
         on_change: impl Fn() + Send + 'static,
     ) -> AppResult<Self> {
         let watch = session.watch_list(collection, filter)?;
+        Self::spawn(watch, on_change)
+    }
+
+    /// Starts watching the groups `request` makes, as `start` does for a list.
+    pub fn start_groups(
+        session: &Session,
+        request: &GroupRequest,
+        on_change: impl Fn() + Send + 'static,
+    ) -> AppResult<Self> {
+        let watch = session.watch_groups(request)?;
+        Self::spawn(watch, on_change)
+    }
+
+    fn spawn(watch: ListWatch, on_change: impl Fn() + Send + 'static) -> AppResult<Self> {
         let stop = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&stop);
         std::thread::Builder::new()

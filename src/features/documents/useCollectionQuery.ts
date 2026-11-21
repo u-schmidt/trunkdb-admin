@@ -3,6 +3,7 @@ import { toAppError } from "../../ipc/backend";
 import { useBackend } from "../../ipc/BackendContext";
 import type { AppError, FilterInput, HintInput, QueryResult, SortInput } from "../../ipc/types";
 import { NO_FILTER } from "./filter";
+import { queueWatch } from "./watchQueue";
 
 /** What decides which documents are listed, apart from the page. */
 export interface Criteria {
@@ -19,22 +20,6 @@ export interface Criteria {
 }
 
 export const PAGE_SIZES = [25, 50, 100] as const;
-
-/**
- * Watch calls per session, each after the one before, so a stop and a start
- * made in order reach the backend in order, whatever the timing of the
- * requests.
- */
-const watchQueues = new Map<string, Promise<unknown>>();
-
-function queueWatch(sessionId: string, call: () => Promise<unknown>): void {
-  const previous = watchQueues.get(sessionId) ?? Promise.resolve();
-  // A call that fails leaves the queue going: a refused watch shows nothing.
-  watchQueues.set(
-    sessionId,
-    previous.then(call).catch(() => undefined),
-  );
-}
 
 export const DEFAULT_CRITERIA: Criteria = {
   filter: NO_FILTER,
@@ -148,6 +133,8 @@ export function useCollectionQuery(
     [send],
   );
 
+  const refresh = useCallback(() => run(wanted.current.criteria, wanted.current.page), [run]);
+
   // The first page of everything; `loading` already starts out true.
   useEffect(() => {
     void send(DEFAULT_CRITERIA, 0);
@@ -157,18 +144,34 @@ export function useCollectionQuery(
     };
   }, [send]);
 
+  // The refresh a change asks for. Read through a ref, so subscribing once
+  // doesn't depend on when `refresh` is made again.
+  const refreshRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
+  // Set while the watch is off. A watch that starts again reports only the
+  // documents there now, so when none match it reports nothing, and rows
+  // removed meanwhile would stay: the list is read again once it starts.
+  const missed = useRef(false);
+
   // The watch is replaced whenever the applied filter changes. Calls go
   // out one after another, so an older filter's watch can't land last.
   const watched = JSON.stringify(applied.filter);
   useEffect(() => {
     if (!live) return;
     const filter = JSON.parse(watched) as FilterInput;
-    queueWatch(sessionId, () => backend.collectionWatch(sessionId, collection, filter));
+    queueWatch(sessionId, async () => {
+      await backend.collectionWatch(sessionId, collection, filter);
+      if (missed.current) {
+        missed.current = false;
+        refreshRef.current();
+      }
+    });
   }, [backend, sessionId, collection, live, watched]);
 
   const apply = useCallback((criteria: Criteria) => run(criteria, 0), [run]);
   const goToPage = useCallback((page: number) => run(position.current.criteria, page), [run]);
-  const refresh = useCallback(() => run(wanted.current.criteria, wanted.current.page), [run]);
   const choose = useCallback(
     (select: string[] | null, except: string[] = []) =>
       run({ ...position.current.criteria, select, except }, position.current.page),
@@ -180,12 +183,6 @@ export function useCollectionQuery(
     [run],
   );
 
-  // The refresh a change asks for. Read through a ref, so subscribing once
-  // doesn't depend on when `refresh` is made again.
-  const refreshRef = useRef<() => void>(() => undefined);
-  useEffect(() => {
-    refreshRef.current = refresh;
-  });
   useEffect(() => {
     if (!live) return;
     const stop = backend.onListChanged((change) => {
@@ -196,6 +193,7 @@ export function useCollectionQuery(
     });
     return () => {
       stop();
+      missed.current = true;
       // This collection's watch goes with the view. Queued behind any watch
       // call made earlier, and it names the collection, so it cannot stop
       // the watch of a list that replaced this one.
