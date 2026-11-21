@@ -529,6 +529,8 @@ export interface FieldPath {
   nameable: boolean;
   /** Documents with a value here, null included; missing isn't. */
   documents: number;
+  /** Documents with no value here: the collection's less `documents`. */
+  missing: number;
   /** Most first. */
   kinds: KindCount[];
 }

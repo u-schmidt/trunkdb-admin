@@ -10,6 +10,9 @@ tagged `vX.Y.Z` and names the trunkdb release it bundles.
   change reaches a group they count, and the Live updates button turns that
   off there too. trunkdb runs the whole aggregate again for each change, so
   on a large collection a change costs more for groups than for a list.
+- **Fields:** the field paths table has its own Missing and Null columns, and
+  Types lists the value kinds other than null; missing counts documents with no
+  value at the path, which a null isn't.
 
 ## 0.2.0 — 2026-11-19
 

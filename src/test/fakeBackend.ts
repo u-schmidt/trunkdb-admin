@@ -62,7 +62,7 @@ export function fakeBackend(overrides: Partial<Backend> = {}): Backend {
         3,
         fieldPath("_id", 3, [["id", 3]]),
         fieldPath("name", 3),
-        fieldPath("age", 2, [
+        fieldPath("age", 3, [
           ["int", 2],
           ["null", 1],
         ]),

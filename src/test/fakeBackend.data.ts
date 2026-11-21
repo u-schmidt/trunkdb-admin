@@ -257,6 +257,7 @@ export function fieldPath(
     text,
     nameable: !path.split(".").some((name) => name.includes("`")),
     documents,
+    missing: 0,
     kinds: kinds.map(([kind, n]) => ({ kind, documents: n })),
   };
 }
@@ -266,5 +267,10 @@ export function fieldPathsOf(
   documents: number,
   ...paths: FieldPath[]
 ): FieldPaths {
-  return { request_id: request.request_id, documents, paths, truncated: false };
+  return {
+    request_id: request.request_id,
+    documents,
+    paths: paths.map((path) => ({ ...path, missing: documents - path.documents })),
+    truncated: false,
+  };
 }

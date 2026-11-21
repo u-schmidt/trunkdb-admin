@@ -19,7 +19,8 @@ import { Workspace } from "../workspace/Workspace";
 vi.mock("../../components/JsonEditor", async () => await import("../../test/PlainJsonEditor"));
 
 // Field paths. The fake backend's paths: _id, name, age (int 2,
-// null 1), tags (array) and tags[*], in 3 documents.
+// null 1), tags (array) and tags[*], in 3 documents: age is missing from
+// none, tags from one, tags[*] from two.
 
 function peopleBackend(overrides: Partial<Backend> = {}) {
   return fakeBackend({
@@ -99,7 +100,7 @@ describe("field path suggestions", () => {
     await waitFor(() => expect(offered(field)).toContain("age"));
     const list = document.getElementById(field.getAttribute("list") ?? "");
     const age = list?.querySelector('option[value="age"]');
-    expect(age?.getAttribute("label")).toBe("2 of 3, int");
+    expect(age?.getAttribute("label")).toBe("3 of 3, int");
   });
 
   it("sets an empty row's type from the path, and never retypes a value", async () => {
@@ -188,11 +189,11 @@ describe("the Fields section", () => {
     const table = await screen.findByRole("table", { name: "Field paths" });
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((row) => row.textContent)).toEqual([
-      "_id3 of 3id 3Copy",
-      "name3 of 3string 3Copy",
-      "age2 of 3int 2 · null 1Copy",
-      "tags2 of 3array 2Copy",
-      "tags[*]1 of 3string 1Copy",
+      "_id3 of 300id 3Copy",
+      "name3 of 300string 3Copy",
+      "age3 of 301int 2Copy",
+      "tags2 of 310array 2Copy",
+      "tags[*]1 of 320string 1Copy",
     ]);
     expect(screen.getByText("5 paths in 3 documents")).toBeVisible();
 

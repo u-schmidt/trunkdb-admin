@@ -104,6 +104,33 @@ fn past_the_cap_paths_are_left_out_and_said_so() {
 }
 
 #[test]
+fn a_path_counts_its_missing_documents_apart_from_its_nulls() {
+    let fx = Fixture::new();
+    fx.insert(
+        "things",
+        &[
+            r#"{"city": "Bonn", "zip": null, "items": [{"sku": "A1"}]}"#,
+            r#"{"city": null, "items": []}"#,
+            r#"{"city": 4}"#,
+            r#"{"other": true}"#,
+        ],
+    );
+
+    let result = paths_of(&fx, "things");
+    let find = |path: &str| result.paths.iter().find(|p| p.path == path).unwrap();
+
+    // Nulls count as documents with a value; only absent fields are missing.
+    let city = find("city");
+    assert_eq!((city.documents, city.missing), (3, 1));
+    let zip = find("zip");
+    assert_eq!((zip.documents, zip.missing), (1, 3));
+    // Under an array, a document with no element there is missing.
+    let sku = find("items[*].sku");
+    assert_eq!((sku.documents, sku.missing), (1, 3));
+    assert_eq!(find("_id").missing, 0);
+}
+
+#[test]
 fn each_paths_documents_are_what_trunkdb_finds_there() {
     let fx = Fixture::new();
     let texts: Vec<String> = (0..300)
@@ -139,6 +166,12 @@ fn each_paths_documents_are_what_trunkdb_finds_there() {
             })
             .unwrap();
         assert_eq!(found as u64, path.documents, "{}", path.path);
+        assert_eq!(
+            path.documents + path.missing,
+            result.documents,
+            "{}",
+            path.path
+        );
         // The text spelling reads back as the same condition.
         let text: Condition = format!("exists({})", path.text).parse().unwrap();
         assert_eq!(text, Condition::exists(path.path.as_str()), "{}", path.text);
