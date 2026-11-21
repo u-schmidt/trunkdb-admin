@@ -6,6 +6,9 @@ import { knownPaths, useFieldPaths } from "./FieldPathsContext";
 
 const kindName = (kind: string) => kind.replace("_", "-");
 
+/** Documents whose value at the path is null: their own column. */
+const nullCount = (path: FieldPath) => path.kinds.find((k) => k.kind === "null")?.documents ?? 0;
+
 /**
  * Every field path of the collection's documents with exact counts,
  * as `trunkdb fields` lists them. Read on opening, kept until
@@ -59,7 +62,13 @@ export function FieldsPanel() {
                 <th scope="col" className="numeric">
                   Documents
                 </th>
-                <th scope="col">Kinds</th>
+                <th scope="col" className="numeric">
+                  Missing
+                </th>
+                <th scope="col" className="numeric">
+                  Null
+                </th>
+                <th scope="col">Types</th>
                 <th scope="col">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -75,8 +84,11 @@ export function FieldsPanel() {
                   <td className="numeric">
                     {path.documents.toLocaleString("en")} of {known.documents.toLocaleString("en")}
                   </td>
+                  <td className="numeric">{path.missing.toLocaleString("en")}</td>
+                  <td className="numeric">{nullCount(path).toLocaleString("en")}</td>
                   <td>
                     {path.kinds
+                      .filter((k) => k.kind !== "null")
                       .map((k) => `${kindName(k.kind)} ${k.documents.toLocaleString("en")}`)
                       .join(" · ")}
                   </td>

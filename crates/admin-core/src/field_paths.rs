@@ -38,6 +38,9 @@ pub struct FieldPath {
     pub nameable: bool,
     /// Documents with a value here, null included; missing isn't.
     pub documents: u64,
+    /// Documents with no value here: the collection's documents less
+    /// `documents`. Under an array, a document with no element is missing.
+    pub missing: u64,
     /// Most first; a tie in `ValueKind`'s order.
     pub kinds: Vec<KindCount>,
 }
@@ -70,10 +73,14 @@ impl Session {
                     summary.add(&doc?);
                 }
             }
+            let mut paths = summary.paths();
+            for path in &mut paths {
+                path.missing = summary.documents - path.documents;
+            }
             Ok(FieldPaths {
                 request_id: request.request_id,
                 documents: summary.documents,
-                paths: summary.paths(),
+                paths,
                 truncated: summary.full,
             })
         })
@@ -221,6 +228,7 @@ fn walk(path: String, text: String, can_name: bool, shape: &Shape, out: &mut Vec
         text: text.clone(),
         nameable: can_name,
         documents: shape.documents,
+        missing: 0,
         kinds,
     });
     for (name, field) in &shape.fields {

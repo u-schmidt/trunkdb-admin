@@ -644,6 +644,7 @@ export function demoBackend(): Backend {
             text: name,
             nameable: true,
             documents: kinds.reduce((sum, k) => sum + k.documents, 0),
+            missing: rows.length - kinds.reduce((sum, k) => sum + k.documents, 0),
             kinds,
           };
         }),
