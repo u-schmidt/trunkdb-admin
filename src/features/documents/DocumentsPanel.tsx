@@ -54,11 +54,10 @@ const PANE_MIN = 288;
 const LIST_MIN = 480;
 
 /**
- * What the list does about other programs' changes: follows them, is
- * turned off, shows groups (made anew, never live), or is open for editing
- * (nothing else writes to it).
+ * What the list (or the groups) does about other programs' changes: follows
+ * them, is turned off, or is open for editing (nothing else writes to it).
  */
-export type ListState = "live" | "off" | "groups" | "editing";
+export type ListState = "live" | "off" | "editing";
 
 /** The status bar's text and its explanation for a list's state; null for none. */
 export function liveStatus(
@@ -75,11 +74,6 @@ export function liveStatus(
       return {
         text: "Live off",
         title: "Live updates are off for this list. Turn them on in the list's toolbar.",
-      };
-    case "groups":
-      return {
-        text: "Groups not live",
-        title: "Groups are made again from the filter each time they are shown.",
       };
     case "editing":
       return null;
@@ -108,7 +102,8 @@ export function DocumentsPanel({
   const guard = useDraftGuard();
   const [view, setView] = useState<View>("json");
   // The list reads again when another program changes it: read-only lists,
-  // while Live is on and the list (not the groups) is in front.
+  // while Live is on and the list (not the groups) is in front. The groups
+  // follow the same switch in their own view.
   const [liveOn, setLiveOn] = useState(true);
   const query = useCollectionQuery(
     sessionId,
@@ -132,12 +127,14 @@ export function DocumentsPanel({
     const clamped = Math.round(Math.min(most, Math.max(PANE_MIN, width)));
     setLayout((previous) => ({ ...previous, width: clamped }));
   };
-  const groups = useGroups(sessionId, collection.name);
   const grouped = view === "groups";
-  const listState: ListState = canMutate ? "editing" : grouped ? "groups" : liveOn ? "live" : "off";
+  const groups = useGroups(sessionId, collection.name, !canMutate && liveOn && grouped);
+  // The status bar shows the change time of whichever view is in front.
+  const changedAt = grouped ? groups.changedAt : query.changedAt;
+  const listState: ListState = canMutate ? "editing" : liveOn ? "live" : "off";
   useEffect(() => {
-    onListState?.(listState, query.changedAt);
-  }, [listState, query.changedAt, onListState]);
+    onListState?.(listState, changedAt);
+  }, [listState, changedAt, onListState]);
   useEffect(() => () => onListState?.(null, null), [onListState]);
 
   // Groups count what the list's filter finds: shown again after the
@@ -431,7 +428,7 @@ export function DocumentsPanel({
                   : "Columns…"}
             </button>
           )}
-          {!canMutate && !grouped && (
+          {!canMutate && (
             <button
               type="button"
               aria-pressed={liveOn}

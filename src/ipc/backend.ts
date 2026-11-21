@@ -65,6 +65,8 @@ export interface Backend {
   collectionWatch(sessionId: string, collection: string, filter: FilterInput): Promise<void>;
   /** Stops the session's watch, if it is this collection's. */
   collectionUnwatch(sessionId: string, collection: string): Promise<void>;
+  /** Watches the groups `request` makes, replacing the session's watch. */
+  collectionGroupsWatch(sessionId: string, request: GroupRequest): Promise<void>;
   /** Calls `handler` for each burst of changes to a watched list; returns how to stop. */
   onListChanged(handler: (change: ListChanged) => void): () => void;
   /** Every field path of a collection's documents, counted; reads them all. */
@@ -164,6 +166,8 @@ export const tauriBackend: Backend = {
   collectionQuery: (sessionId, request) => invoke("collection_query", { sessionId, request }),
   collectionWatch: (sessionId, collection, filter) =>
     invoke("collection_watch", { sessionId, collection, filter }),
+  collectionGroupsWatch: (sessionId, request) =>
+    invoke("collection_groups_watch", { sessionId, request }),
   collectionUnwatch: (sessionId, collection) =>
     invoke("collection_unwatch", { sessionId, collection }),
   onListChanged: (handler) => {

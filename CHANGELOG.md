@@ -3,6 +3,14 @@
 What changed in each release of TrunkDB Admin, newest first. Each release is
 tagged `vX.Y.Z` and names the trunkdb release it bundles.
 
+## Unreleased
+
+- **Live groups:** in a read-only session, the Groups view follows other
+  programs' writes the way a list does: the groups are counted again when a
+  change reaches a group they count, and the Live updates button turns that
+  off there too. trunkdb runs the whole aggregate again for each change, so
+  on a large collection a change costs more for groups than for a list.
+
 ## 0.2.0 — 2026-11-19
 
 The first release since 0.1.0, with trunkdb 0.43.0 (tag `v0.43.0`). Files

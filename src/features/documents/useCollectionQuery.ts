@@ -3,6 +3,7 @@ import { toAppError } from "../../ipc/backend";
 import { useBackend } from "../../ipc/BackendContext";
 import type { AppError, FilterInput, HintInput, QueryResult, SortInput } from "../../ipc/types";
 import { NO_FILTER } from "./filter";
+import { queueWatch } from "./watchQueue";
 
 /** What decides which documents are listed, apart from the page. */
 export interface Criteria {
@@ -19,22 +20,6 @@ export interface Criteria {
 }
 
 export const PAGE_SIZES = [25, 50, 100] as const;
-
-/**
- * Watch calls per session, each after the one before, so a stop and a start
- * made in order reach the backend in order, whatever the timing of the
- * requests.
- */
-const watchQueues = new Map<string, Promise<unknown>>();
-
-function queueWatch(sessionId: string, call: () => Promise<unknown>): void {
-  const previous = watchQueues.get(sessionId) ?? Promise.resolve();
-  // A call that fails leaves the queue going: a refused watch shows nothing.
-  watchQueues.set(
-    sessionId,
-    previous.then(call).catch(() => undefined),
-  );
-}
 
 export const DEFAULT_CRITERIA: Criteria = {
   filter: NO_FILTER,

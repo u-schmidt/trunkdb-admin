@@ -42,6 +42,48 @@ fn a_read_only_list_hears_a_matching_write_beside_it_and_not_another() {
     assert_eq!(watch.wait(Duration::from_secs(5)), Wait::Ended);
 }
 
+#[test]
+fn a_read_only_groups_list_hears_a_write_that_changes_a_group_it_counts() {
+    use trunkdb_admin_core::GroupRequest;
+
+    let fixture = Fixture::new();
+    fixture.insert("people", &[r#"{"name": "Ann", "city": "Bonn"}"#]);
+    fixture.manager.close(fixture.session.id()).unwrap();
+
+    let session = fixture.manager.open_read_only(&fixture.path).unwrap();
+    let request = GroupRequest {
+        request_id: 1,
+        collection: "people".into(),
+        filter: FilterInput::Text(r#"city = "Bonn""#.into()),
+        unwind: Vec::new(),
+        group_by: vec!["city".into()],
+        columns: Vec::new(),
+        sort: None,
+        page: 0,
+        page_size: 50,
+    };
+    let watch = session.watch_groups(&request).unwrap();
+    settle(&watch);
+
+    let writer = Database::open(&fixture.path).unwrap();
+    let people = writer.collection::<Document>("people");
+    // Another city is outside the filter, so no group changes.
+    people
+        .insert(doc(r#"{"name": "Dee", "city": "Hamburg"}"#))
+        .unwrap();
+    assert_eq!(watch.wait(Duration::from_secs(1)), Wait::Quiet);
+
+    people
+        .insert(doc(r#"{"name": "Cy", "city": "Bonn"}"#))
+        .unwrap();
+    assert_eq!(watch.wait(Duration::from_secs(5)), Wait::Changed);
+
+    drop(people);
+    drop(writer);
+    fixture.manager.close(session.id()).unwrap();
+    assert_eq!(watch.wait(Duration::from_secs(5)), Wait::Ended);
+}
+
 /// Ignored by default: needs the pinned CLI (`npm run test:cli`, or
 /// `scripts/install-pinned-cli.sh` then `cargo test --test watch -- --ignored`).
 /// The write comes from a separate process, as another program's would.

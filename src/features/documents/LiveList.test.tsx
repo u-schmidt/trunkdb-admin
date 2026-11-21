@@ -132,14 +132,42 @@ describe("the list's live state in the status bar", () => {
     expect(within(statusBar()).queryByText(/Live/)).toBeNull();
   });
 
-  it("says the groups are not live", async () => {
+  it("says Live for the groups too, with the same toolbar toggle", async () => {
     const backend = tasksBackend();
     await openTasks(backend, true);
+    const user = userEvent.setup();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Groups" }));
+    await user.click(screen.getByRole("button", { name: "Groups" }));
 
-    expect(await within(statusBar()).findByText("Groups not live")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Live updates" })).toBeNull();
+    expect(within(statusBar()).getByText("Live")).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Live updates" });
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(within(statusBar()).getByText("Live off")).toBeInTheDocument();
+    expect(backend.collectionUnwatch).toHaveBeenCalledWith("s1", "tasks");
+  });
+
+  it("watches the groups once they are run, and groups again when they change", async () => {
+    const backend = tasksBackend();
+    await openTasks(backend, true);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Groups" }));
+    expect(backend.collectionGroupsWatch).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("Group field 1"), "status");
+    await user.click(screen.getByRole("button", { name: "Run groups" }));
+
+    await waitFor(() =>
+      expect(backend.collectionGroupsWatch).toHaveBeenCalledWith(
+        "s1",
+        expect.objectContaining({ collection: "tasks", group_by: ["status"] }),
+      ),
+    );
+    const groupsRead = () => vi.mocked(backend.collectionGroups).mock.calls.length;
+    const before = groupsRead();
+    listener(backend)({ session_id: "s1", collection: "tasks" });
+    await waitFor(() => expect(groupsRead()).toBe(before + 1));
+    expect(await within(statusBar()).findByText(/^Live · updated \d/)).toBeInTheDocument();
   });
 });
 
