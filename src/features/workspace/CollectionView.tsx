@@ -1,12 +1,11 @@
 import { Braces, KeyRound, List, Trash2 } from "lucide-react";
-import { useState } from "react";
 import type { AppError, CollectionSummary, Overview } from "../../ipc/types";
 import { DocumentsPanel, type ListState } from "../documents/DocumentsPanel";
 import { FieldPathsProvider, useFieldPaths } from "../fields/FieldPathsContext";
 import { FieldsPanel } from "../fields/FieldsPanel";
 import { IndexPanel } from "../indexes/IndexPanel";
 
-type Section = "documents" | "indexes" | "fields";
+export type Section = "documents" | "indexes" | "fields";
 
 interface Props {
   sessionId: string;
@@ -18,6 +17,9 @@ interface Props {
   /** Asks to delete this collection; confirmation follows elsewhere. */
   onDelete: () => void;
   onListState: (state: ListState | null, changedAt: Date | null) => void;
+  /** The tab in front; kept by the workspace across collections. */
+  section: Section;
+  onSection: (section: Section) => void;
 }
 
 export function CollectionView({
@@ -28,8 +30,9 @@ export function CollectionView({
   onOverview,
   onDelete,
   onListState,
+  section,
+  onSection,
 }: Props) {
-  const [section, setSection] = useState<Section>("documents");
   return (
     // Field paths are read once for every path input of the collection;
     // a new collection is a new view, so they start afresh.
@@ -57,7 +60,7 @@ export function CollectionView({
             <button
               type="button"
               aria-pressed={section === "documents"}
-              onClick={() => setSection("documents")}
+              onClick={() => onSection("documents")}
             >
               <List aria-hidden="true" />
               Documents
@@ -65,7 +68,7 @@ export function CollectionView({
             <button
               type="button"
               aria-pressed={section === "indexes"}
-              onClick={() => setSection("indexes")}
+              onClick={() => onSection("indexes")}
             >
               <KeyRound aria-hidden="true" />
               Indexes
@@ -73,7 +76,7 @@ export function CollectionView({
             <button
               type="button"
               aria-pressed={section === "fields"}
-              onClick={() => setSection("fields")}
+              onClick={() => onSection("fields")}
             >
               <Braces aria-hidden="true" />
               Fields

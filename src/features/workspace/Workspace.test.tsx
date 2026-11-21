@@ -750,6 +750,22 @@ describe("filter, sort and paging", () => {
     expect(screen.getByText(/page 2 of 3/)).toBeVisible();
     expect(requests(backend)).toHaveLength(2);
   });
+
+  it("keeps the tab in front when another collection is chosen", async () => {
+    const backend = peopleBackend({
+      sessionOverview: vi.fn(async () =>
+        overviewOf(collection("orders", 5), collection("people", 3)),
+      ),
+    });
+    const user = await openPeople(backend);
+    await user.click(screen.getByRole("button", { name: "Indexes" }));
+
+    await openCollection(user, "orders");
+
+    expect(screen.getByRole("button", { name: "Indexes" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("table", { name: "Indexes" })).toBeVisible();
+    expect(screen.queryByRole("list", { name: "Documents as JSON" })).not.toBeInTheDocument();
+  });
 });
 
 describe("explain and statement panels", () => {
