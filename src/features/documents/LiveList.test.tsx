@@ -104,6 +104,23 @@ describe("the list's live state in the status bar", () => {
     expect(await within(statusBar()).findByText(/^Live · updated \d/)).toBeInTheDocument();
   });
 
+  it("reads the list again when Live comes back on, as its watch starts", async () => {
+    const backend = tasksBackend();
+    await openTasks(backend, true);
+    const user = userEvent.setup();
+    const toggle = screen.getByRole("button", { name: "Live updates" });
+    await user.click(toggle);
+    // Rows go away while Live is off: the restarted watch reports none.
+    vi.mocked(backend.collectionQuery).mockImplementation(async (_s, request) =>
+      resultFor(request, [], 0),
+    );
+    const before = queries(backend);
+
+    await user.click(toggle);
+
+    await waitFor(() => expect(queries(backend)).toBe(before + 1));
+  });
+
   it("turns the watch off and on with the toolbar button", async () => {
     const stop = vi.fn();
     const backend = tasksBackend({ onListChanged: vi.fn(() => stop) });
@@ -145,6 +162,24 @@ describe("the list's live state in the status bar", () => {
     expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(within(statusBar()).getByText("Live off")).toBeInTheDocument();
     expect(backend.collectionUnwatch).toHaveBeenCalledWith("s1", "tasks");
+  });
+
+  it("groups again when Live comes back on, as the groups' watch starts", async () => {
+    const backend = tasksBackend();
+    await openTasks(backend, true);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Groups" }));
+    await user.type(screen.getByLabelText("Group field 1"), "status");
+    await user.click(screen.getByRole("button", { name: "Run groups" }));
+    await waitFor(() => expect(backend.collectionGroupsWatch).toHaveBeenCalled());
+    const toggle = screen.getByRole("button", { name: "Live updates" });
+    await user.click(toggle);
+    const groupsRead = () => vi.mocked(backend.collectionGroups).mock.calls.length;
+    const before = groupsRead();
+
+    await user.click(toggle);
+
+    await waitFor(() => expect(groupsRead()).toBe(before + 1));
   });
 
   it("watches the groups once they are run, and groups again when they change", async () => {

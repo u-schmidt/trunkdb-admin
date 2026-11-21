@@ -139,20 +139,31 @@ export function useGroups(sessionId: string, collection: string, live = false): 
     if (wanted.current !== null) send(wanted.current.ask, wanted.current.page);
   }, [send]);
 
+  // The refresh a change asks for, read through a ref as the list's is.
+  const refreshRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
+  // Set while the watch is off. A watch that starts again reports only the
+  // documents there now, so when none match it reports nothing, and rows
+  // removed meanwhile would stay: the list is read again once it starts.
+  const missed = useRef(false);
+
   // The watch is replaced whenever the applied groups change. Keyed on their
   // text, so a page change alone doesn't start a new watch.
   const appliedKey = applied === null ? null : JSON.stringify(applied);
   useEffect(() => {
     if (!live || appliedKey === null) return;
     const ask = JSON.parse(appliedKey) as GroupAsk;
-    queueWatch(sessionId, () => backend.collectionGroupsWatch(sessionId, requestFor(ask, 0, 0)));
+    queueWatch(sessionId, async () => {
+      await backend.collectionGroupsWatch(sessionId, requestFor(ask, 0, 0));
+      if (missed.current) {
+        missed.current = false;
+        refreshRef.current();
+      }
+    });
   }, [backend, sessionId, live, appliedKey, requestFor]);
 
-  // The refresh a change asks for, read through a ref as the list's is.
-  const refreshRef = useRef<() => void>(() => undefined);
-  useEffect(() => {
-    refreshRef.current = refresh;
-  });
   useEffect(() => {
     if (!live) return;
     const stop = backend.onListChanged((change) => {
@@ -163,6 +174,7 @@ export function useGroups(sessionId: string, collection: string, live = false): 
     });
     return () => {
       stop();
+      missed.current = true;
       // Queued behind any watch call made earlier, and it names the
       // collection, so it cannot stop a watch that replaced this one.
       queueWatch(sessionId, () => backend.collectionUnwatch(sessionId, collection));
